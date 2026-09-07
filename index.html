@@ -1042,16 +1042,72 @@
             document.getElementById("groupRombel").style.display = (tingkat === "Guru") ? "none" : "block";
         }
 
-        function lanjutKeQRIS() {
+     function lanjutKeQRIS() {
+            // Langsung proses DOKU tanpa menampilkan modal Upload QRIS lama
+            prosesPembayaranQRIS();
+        }
+
+        async function prosesPembayaranQRIS() {
             const nama = document.getElementById("inputNama").value.trim();
+            const tingkat = document.getElementById("inputTingkat").value;
+            const jurusan = document.getElementById("inputJurusan").value;
+            const rombel = document.getElementById("inputRombel").value;
+            const catatan = document.getElementById("inputCatatan").value;
+            
             if (nama.length < 3) return alert("Mohon masukkan nama lengkap yang valid!");
+            
+            const kelasLengkap = tingkat === "Guru" ? "Guru" : `${tingkat} ${jurusan} ${rombel}`;
 
             let total = 0;
             cart.forEach(i => total += (i.price * i.qty));
-            document.getElementById("qris-total-price").innerText = total.toLocaleString('id-ID');
 
-            document.getElementById("checkoutModal").classList.remove("open");
-            document.getElementById("qrisModal").classList.add("open");
+            const noPesanan = `UP-${Date.now().toString().slice(-6)}`;
+            
+            activeOrder = { idPesanan: noPesanan, nama, kelas: kelasLengkap, catatan, items: [...cart], total, status: "Menunggu Pembayaran" };
+
+            // Ubah tampilan modal jadi "Loading"
+            document.getElementById("checkoutModal").innerHTML = `
+                <div class="modal-content" style="max-width: 420px; text-align: center;">
+                    <h3><i class="fa-solid fa-spinner fa-spin"></i> Memproses...</h3>
+                    <p>Sedang membuat tagihan pembayaran otomatis...</p>
+                </div>
+            `;
+
+            try {
+                // Menembak ke backend Netlify Functions
+                const response = await fetch('/.netlify/functions/buat-pembayaran', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        idPesanan: noPesanan,
+                        total: total,
+                        nama: nama,
+                        kelas: kelasLengkap,
+                        catatan: catatan,
+                        items: cart
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Simpan pesanan di HP/Laptop pembeli sementara
+                    saveLS("up_activeOrder", activeOrder); 
+                    cart = []; 
+                    saveAndSync();
+                    
+                    // Arahkan otomatis ke halaman resmi DOKU
+                    window.location.href = result.payment_url;
+                } else {
+                    alert("Gagal membuat tagihan DOKU: " + result.message);
+                    kembaliKeKatalog();
+                }
+
+            } catch (error) {
+                alert("Terjadi kesalahan jaringan atau Backend belum aktif.");
+                console.error(error);
+                kembaliKeKatalog();
+            }
         }
 
         function prosesPembayaranQRIS() {
