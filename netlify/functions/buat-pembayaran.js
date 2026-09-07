@@ -12,15 +12,15 @@ exports.handler = async (event, context) => {
         const { idPesanan, total, nama } = data;
 
         // ====================================================================
-        // GANTI BAGIAN INI DENGAN CLIENT ID DAN SECRET KEY KAMU YANG ASLI
+        // KREDENSIAL DOKU LIVE (PRODUKSI)
         // ====================================================================
         const CLIENT_ID = 'BRN-0243-1788663032393';
         const SECRET_KEY = 'SK-QsyHcfr32V860Emcub52';
         // ====================================================================
 
-        // Kita gunakan URL mode "Sandbox" (Uji Coba) DOKU dulu biar aman
+        // URL Mode Live (Asli) DOKU
         const targetPath = '/checkout/v1/payment';
-       const url = 'https://api.doku.com' + targetPath;
+        const url = 'https://api.doku.com' + targetPath;
 
         // 2. Membuat data wajib untuk keamanan API DOKU
         const requestId = crypto.randomUUID(); // Bikin ID acak
@@ -30,14 +30,14 @@ exports.handler = async (event, context) => {
         const requestBody = {
             order: {
                 invoice_number: idPesanan,
-                amount: total // Total harga dari keranjang
+                amount: Number(total) // Memastikan total selalu berupa angka bulat
             },
             payment: {
                 payment_due_date: 60 // Waktu kadaluarsa link (60 menit)
             },
             customer: {
-                name: nama,
-                email: "pembeli@smkyadika13.com" // Email sementara
+                name: nama || "Pelanggan",
+                email: "pembeli@smkyadika13.com"
             }
         };
 
@@ -48,7 +48,7 @@ exports.handler = async (event, context) => {
         const signatureComponent = `Client-Id:${CLIENT_ID}\nRequest-Id:${requestId}\nRequest-Timestamp:${timestamp}\nRequest-Target:${targetPath}\nDigest:${digest}`;
         const signature = crypto.createHmac('sha256', SECRET_KEY).update(signatureComponent).digest('base64');
 
-        // 5. Mengirim permintaan (Request) ke Server DOKU
+        // 5. Mengirim permintaan (Request) ke Server DOKU Live
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -73,7 +73,7 @@ exports.handler = async (event, context) => {
                 })
             };
         } else {
-            console.error("DOKU Error:", dokuResult);
+            console.error("DOKU Live Error Response:", JSON.stringify(dokuResult));
             return {
                 statusCode: 400,
                 body: JSON.stringify({ 
