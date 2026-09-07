@@ -20,7 +20,7 @@ exports.handler = async (event, context) => {
 
         // Kita gunakan URL mode "Sandbox" (Uji Coba) DOKU dulu biar aman
         const targetPath = '/checkout/v1/payment';
-        const url = 'https://api-sandbox.doku.com' + targetPath;
+       const url = 'https://api.doku.com' + targetPath;
 
         // 2. Membuat data wajib untuk keamanan API DOKU
         const requestId = crypto.randomUUID(); // Bikin ID acak
