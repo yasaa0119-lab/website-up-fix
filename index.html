@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Katalog belanja online Unit Produksi SMK Yadika 13 - pesan langsung, bayar QRIS, konfirmasi via WhatsApp.">
+    <meta name="description" content="Katalog belanja online Unit Produksi SMK Yadika 13 - pesan langsung, bayar otomatis via DOKU.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛒</text></svg>">
     <title>Unit Produksi SMK Yadika 13</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -297,10 +297,6 @@
         .btn-cancel { background: var(--paper); color: var(--ink-soft); border: 1px solid var(--line); }
         .btn-pay { background: var(--accent); color: white; }
 
-        .qris-img { width: 140px; border-radius: 8px; margin: 8px auto; display: block; border: 1px solid var(--line); padding: 6px; }
-        .btn-download-qris { display: inline-block; color: var(--accent); font-size: 0.75rem; font-weight: 700; text-decoration: underline; margin-bottom: 8px; }
-        .info-note { background: var(--accent-soft); color: var(--accent-hover); padding: 10px; border-radius: 8px; font-size: 0.75rem; margin-bottom: 12px; text-align: left; line-height: 1.4; border: 1px solid var(--line); }
-
         #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: white; padding: 10px 20px; border-radius: 50px; font-size: 0.82rem; font-weight: 600; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 300; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 8px; }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -554,26 +550,6 @@
         </div>
     </div>
 
-    <!-- MODAL QRIS -->
-    <div id="qrisModal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
-            <h3 style="margin-bottom: 4px;">Scan Pembayaran QRIS</h3>
-            <p style="margin-bottom: 4px;">Total Tagihan:</p>
-            <h2 style="color: var(--accent); margin-bottom: 8px; font-size: 1.25rem;">Rp <span id="qris-total-price">0</span></h2>
-            <img src="gambar/qris.jpeg" alt="QRIS" id="qrisImageElement" class="qris-img" onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 160 160%22><rect width=%22160%22 height=%22160%22 fill=%22%23FCE8EE%22 stroke=%22%23F2DCE2%22/><text x=%2280%22 y=%2280%22 font-size=%2214%22 text-anchor=%22middle%22 fill=%22%238C787D%22>QRIS</text></svg>'">
-            <a href="gambar/qris.jpeg" download="QRIS_Yadika13.jpeg" class="btn-download-qris"><i class="fa-solid fa-download"></i> Download Gambar QRIS</a>
-            <div class="info-note"><b>Penting:</b> Setelah klik "Saya Sudah Bayar", WhatsApp akan terbuka otomatis dan Anda wajib mengirimkan foto bukti transfer ke Admin.</div>
-            <div class="input-group" style="background:var(--paper); padding:8px; border-radius:8px; border:1px solid var(--line);">
-                <label style="color:var(--accent);"><i class="fa-solid fa-image"></i> Upload Bukti Transfer</label>
-                <input type="file" id="inputBukti" accept="image/*" style="background:white; font-size: 0.75rem; padding:4px;">
-            </div>
-            <div class="btn-group" style="flex-direction: column; gap: 8px;">
-                <button class="btn-pay" style="width: 100%;" onclick="prosesPembayaranQRIS()"><i class="fa-solid fa-check"></i> Saya Sudah Bayar & Kirim WA</button>
-                <button class="btn-cancel" style="width: 100%;" onclick="document.getElementById('qrisModal').classList.remove('open')">Batal</button>
-            </div>
-        </div>
-    </div>
-
     <!-- ==================== FIREBASE (DATABASE) ==================== -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
@@ -593,7 +569,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Expose ke script utama (yang bukan module) lewat window
         window.fbDb = db;
         window.fbFns = { doc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp };
         window.fbReady = true;
@@ -746,7 +721,6 @@
             filterProducts(); 
         }
 
-        /* === FUNGSI ANIMASI SEARCH BAR (TIKTOK STYLE) === */
         function toggleSearch(event) {
             event.stopPropagation();
             const bar = document.getElementById("searchBarContainer");
@@ -1042,11 +1016,11 @@
             document.getElementById("groupRombel").style.display = (tingkat === "Guru") ? "none" : "block";
         }
 
-     function lanjutKeQRIS() {
-            // Langsung proses DOKU tanpa menampilkan modal Upload QRIS lama
+        function lanjutKeQRIS() {
             prosesPembayaranQRIS();
         }
 
+        // FUNGSI UTAMA PEMBAYARAN DOKU
         async function prosesPembayaranQRIS() {
             const nama = document.getElementById("inputNama").value.trim();
             const tingkat = document.getElementById("inputTingkat").value;
@@ -1074,7 +1048,6 @@
             `;
 
             try {
-                // Menembak ke backend Netlify Functions
                 const response = await fetch('/.netlify/functions/buat-pembayaran', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1091,12 +1064,11 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    // Simpan pesanan di HP/Laptop pembeli sementara
                     saveLS("up_activeOrder", activeOrder); 
                     cart = []; 
                     saveAndSync();
                     
-                    // Arahkan otomatis ke halaman resmi DOKU
+                    // Langsung pindah ke halaman DOKU
                     window.location.href = result.payment_url;
                 } else {
                     alert("Gagal membuat tagihan DOKU: " + result.message);
@@ -1110,57 +1082,8 @@
             }
         }
 
-        function prosesPembayaranQRIS() {
-            const nama = document.getElementById("inputNama").value;
-            const tingkat = document.getElementById("inputTingkat").value;
-            const jurusan = document.getElementById("inputJurusan").value;
-            const rombel = document.getElementById("inputRombel").value;
-            const catatan = document.getElementById("inputCatatan").value;
-            const inputBukti = document.getElementById("inputBukti");
-            const kelasLengkap = tingkat === "Guru" ? "Guru" : `${tingkat} ${jurusan} ${rombel}`;
-
-            if (!inputBukti || !inputBukti.files[0]) return alert("Harap upload foto bukti transfer terlebih dahulu!");
-
-            let total = 0, detail = "";
-            cart.forEach(i => {
-                let sub = i.price * i.qty;
-                total += sub;
-                detail += `- ${i.name} (${i.qty}x) : Rp ${sub.toLocaleString('id-ID')}%0A`;
-            });
-
-            const noPesanan = `UP-${Date.now().toString().slice(-6)}`;
-            activeOrder = { idPesanan: noPesanan, nama, kelas: kelasLengkap, catatan, items: [...cart], total, status: "Diproses" };
-
-            simpanPesananKeDatabase(activeOrder);
-
-            const adminWA = "6285810481833";
-            const teksWA = `Halo Admin Unit Produksi, saya sudah *TRANSFER VIA QRIS* ✅%0A%0A*No. Pesanan:* ${noPesanan}%0A*Nama:* ${nama}%0A*Kelas:* ${kelasLengkap}%0A*Catatan:* ${catatan || '-'}%0A%0A*Rincian Pesanan:*%0A${detail}%0A*Total:* Rp ${total.toLocaleString('id-ID')}%0A%0A*(Bukti transfer terlampir di chat)*`;
-
-            window.open(`https://wa.me/${adminWA}?text=${teksWA}`, "_blank");
-
-            document.getElementById("qrisModal").classList.remove("open");
-            cart = []; saveAndSync();
-            bukaHalamanPesananAktif();
-        }
-
         /* ===== INTEGRASI DATABASE (FIRESTORE) ===== */
         let unsubPesanan = null;
-
-        function simpanPesananKeDatabase(order) {
-            if (!window.fbReady) {
-                return document.addEventListener("firebase-ready", () => simpanPesananKeDatabase(order), { once: true });
-            }
-            const { doc, setDoc, serverTimestamp } = window.fbFns;
-            setDoc(doc(window.fbDb, "pesanan", order.idPesanan), {
-                nama: order.nama,
-                kelas: order.kelas,
-                catatan: order.catatan || "",
-                items: order.items,
-                total: order.total,
-                status: order.status || "Diproses",
-                dibuat: serverTimestamp()
-            }).catch(err => console.error("Gagal simpan ke database:", err));
-        }
 
         function pantauStatusPesanan(idPesanan) {
             if (!window.fbReady) {
