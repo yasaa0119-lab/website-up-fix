@@ -1,51 +1,51 @@
 const crypto = require('crypto');
 
 exports.handler = async (event, context) => {
-    // Hanya izinkan metode POST
+    // Header agar diizinkan diakses oleh domain .my.id kamu
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    };
+
+    // Tangani preflight request dari browser
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
+
     if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: 'Metode tidak diizinkan' };
+        return { statusCode: 405, headers, body: 'Metode tidak diizinkan' };
     }
 
     try {
-        // 1. Menerima data pesanan dari frontend
         const data = JSON.parse(event.body);
         const { idPesanan, total, nama } = data;
 
-        // ====================================================================
-        // KREDENSIAL DUITKU (DAPATKAN DI DASHBOARD DUITKU -> INTEGRASI)
-        // ====================================================================
-        const MERCHANT_CODE = 'DS35495'; // Contoh: D12345
-        const API_KEY = '282b322af7228e1f7260160b2a96a715'; // Contoh: d22c830xxxxxxx
-        
-        // Ubah jadi "true" HANYA jika akun Duitku kamu sudah diverifikasi (Live)
+        const MERCHANT_CODE = 'DS35495'; 
+        const API_KEY = '282b322af7228e1f7260160b2a96a715'; 
         const IS_PRODUCTION = false; 
-        // ====================================================================
 
-        // Tentukan URL tujuan (Sandbox/Uji Coba vs Production/Asli)
         const url = IS_PRODUCTION 
-            ? 'https://passport.duitku.com/webapi/api/merchant/v2/inquiry' // LIVE
-            : 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry'; // SANDBOX
+            ? 'https://passport.duitku.com/webapi/api/merchant/v2/inquiry' 
+            : 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry'; 
 
-        // 2. Rumus Signature Keamanan Duitku: MD5(merchantCode + idPesanan + totalAmount + apiKey)
         const amountStr = String(total);
         const signatureString = MERCHANT_CODE + idPesanan + amountStr + API_KEY;
         const signature = crypto.createHash('md5').update(signatureString).digest('hex');
 
-        // 3. Menyusun informasi tagihan ke Duitku (Diperbarui ke domain kustom .my.id)
         const requestBody = {
             merchantCode: MERCHANT_CODE,
             paymentAmount: Number(total),
             merchantOrderId: idPesanan,
             productDetails: `Pesanan Unit Produksi SMK Yadika 13 (${idPesanan})`,
-            email: "pembeli@smkyadika13.com", // Duitku wajib butuh email, kita buat statis saja
+            email: "pembeli@smkyadika13.com",
             customerVaName: nama || "Pelanggan",
-            returnUrl: "https://unitproduksismkyadika13.my.id", // Redirect pembeli setelah bayar ke domain baru
+            returnUrl: "https://unitproduksismkyadika13.my.id", 
             callbackUrl: "https://unitproduksismkyadika13.netlify.app/.netlify/functions/duitku-callback", 
             signature: signature,
-            expiryPeriod: 60 // Waktu kadaluarsa (60 menit)
+            expiryPeriod: 60
         };
 
-        // 4. Mengirim permintaan ke server Duitku
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -54,19 +54,19 @@ exports.handler = async (event, context) => {
 
         const result = await response.json();
 
-        // 5. Cek apakah Duitku berhasil membalas dengan status "00" (Sukses)
         if (result.statusCode === "00" && result.paymentUrl) {
             return {
                 statusCode: 200,
+                headers,
                 body: JSON.stringify({ 
                     success: true, 
                     payment_url: result.paymentUrl 
                 })
             };
         } else {
-            console.error("Duitku Error Response:", JSON.stringify(result));
             return {
                 statusCode: 400,
+                headers,
                 body: JSON.stringify({ 
                     success: false, 
                     message: result.statusMessage || "Gagal mendapatkan link dari Duitku", 
@@ -76,9 +76,9 @@ exports.handler = async (event, context) => {
         }
 
     } catch (error) {
-        console.error("Server Error:", error);
         return {
             statusCode: 500,
+            headers,
             body: JSON.stringify({ success: false, message: error.message })
         };
     }
