@@ -1067,7 +1067,7 @@
             prosesPembayaranQRIS();
         }
 
-        // FUNGSI UTAMA PEMBAYARAN DOKU (TERHUBUNG KE NETLIFY BACKEND)
+        // FUNGSI UTAMA PEMBAYARAN DOKU (TERHUBUNG KE RENDER BACKEND)
         async function prosesPembayaranQRIS() {
             const nama = document.getElementById("inputNama").value.trim();
             const tingkat = document.getElementById("inputTingkat").value;
@@ -1095,8 +1095,8 @@
             `;
 
             try {
-                // Diarahkan langsung ke URL Netlify backend agar bisa diakses dari GitHub Pages (.my.id)
-                const response = await fetch('https://unitproduksismkyadika13.netlify.app/.netlify/functions/buat-pembayaran', {
+                // Diarahkan ke URL backend Render kamu (Ganti URL di bawah nanti setelah Render aktif)
+                const response = await fetch('https://backend-yadika13.onrender.com/api/buat-pembayaran', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
