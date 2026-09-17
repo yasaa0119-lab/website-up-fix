@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,450;9..144,560;9..144,650&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PUSTAKA MD5 UNTUK ENKRIPSI DUITKU DI BROWSER -->
+    <script src="https://cdn.jsdelivr.net/npm/blueimp-md5@2.19.0/js/md5.min.js"></script>
     <style>
         :root {
             --paper: #FCF7F8;
@@ -1067,7 +1069,7 @@
             prosesPembayaranQRIS();
         }
 
-        // FUNGSI UTAMA PEMBAYARAN DOKU (TERHUBUNG KE RENDER BACKEND)
+        // FUNGSI UTAMA PEMBAYARAN DOKU (MURNI CLIENT-SIDE / BROWSER)
         async function prosesPembayaranQRIS() {
             const nama = document.getElementById("inputNama").value.trim();
             const tingkat = document.getElementById("inputTingkat").value;
@@ -1095,38 +1097,51 @@
             `;
 
             try {
-                // Diarahkan ke URL backend Render kamu (Ganti URL di bawah nanti setelah Render aktif)
-                const response = await fetch('https://backend-yadika13.onrender.com/api/buat-pembayaran', {
+                const MERCHANT_CODE = 'DS35495';
+                const API_KEY = '282b322af7228e1f7260160b2a96a715';
+                const paymentAmount = Number(total);
+                const merchantOrderId = noPesanan;
+
+                // Membuat signature menggunakan library md5 yang dimuat di head
+                const signatureString = MERCHANT_CODE + merchantOrderId + paymentAmount + API_KEY;
+                const signature = md5(signatureString);
+
+                const requestBody = {
+                    merchantCode: MERCHANT_CODE,
+                    paymentAmount: paymentAmount,
+                    merchantOrderId: merchantOrderId,
+                    productDetails: `Pesanan Unit Produksi SMK Yadika 13 (${merchantOrderId})`,
+                    email: "pembeli@smkyadika13.com",
+                    customerVaName: nama || "Pelanggan",
+                    returnUrl: "https://unitproduksismkyadika13.my.id",
+                    callbackUrl: "https://unitproduksismkyadika13.my.id",
+                    signature: signature,
+                    expiryPeriod: 60
+                };
+
+                const response = await fetch('https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        idPesanan: noPesanan,
-                        total: total,
-                        nama: nama,
-                        kelas: kelasLengkap,
-                        catatan: catatan,
-                        items: cart
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 const result = await response.json();
 
-                if (result.success && result.payment_url) {
-                    activeOrder.paymentUrl = result.payment_url;
+                if (result.statusCode === "00" && result.paymentUrl) {
+                    activeOrder.paymentUrl = result.paymentUrl;
                     saveLS("up_activeOrder", activeOrder); 
                     cart = []; 
                     saveAndSync();
                     
-                    // Langsung pindah ke halaman DOKU
-                    window.location.href = result.payment_url;
+                    window.location.href = result.paymentUrl;
                 } else {
-                    alert("Gagal membuat tagihan duitku: " + result.message);
+                    alert("Gagal membuat tagihan Duitku: " + (result.statusMessage || "Kesalahan sistem"));
                     kembaliKeKatalog();
                 }
 
             } catch (error) {
-                alert("Terjadi kesalahan jaringan atau Backend belum aktif.");
                 console.error(error);
+                alert("Terjadi kendala koneksi saat menghubungi Duitku.");
                 kembaliKeKatalog();
             }
         }
@@ -1181,7 +1196,7 @@
                     <div style="font-weight:800; margin-top:12px; text-align:right; font-size:1.05rem; color:var(--accent); font-family:'Fraunces', serif;">Total: Rp ${activeOrder.total.toLocaleString('id-ID')}</div>
                     <div style="margin-top: 12px; display: flex; gap: 10px;">
                         ${btnLanjutBayar}
-                        <button style="flex: 1; padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--accent); font-weight:700; cursor:pointer;" onclick="document.getElementById('cancelModal').classList.add('open')">Batalkan Pesanan</button>
+                        <button style="flex: 1; padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--accent); font-weight:700; cursor:pointer;" onclick="document.getElementById('cancelModal').classList.add('open')">Batalkan Pesanan</i></button>
                     </div>
                 </div>
             `;
@@ -1223,10 +1238,6 @@
 
         setTheme(currentTheme);
 
-        function toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute("data-theme");
-            setTheme(currentTheme === "dark" ? "light" : "dark");
-        }
         // ===========================
 
         document.addEventListener("DOMContentLoaded", () => {
