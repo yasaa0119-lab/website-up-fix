@@ -31,7 +31,7 @@ exports.handler = async (event, context) => {
         const signatureString = MERCHANT_CODE + idPesanan + amountStr + API_KEY;
         const signature = crypto.createHash('md5').update(signatureString).digest('hex');
 
-        // 3. Menyusun informasi tagihan ke Duitku
+        // 3. Menyusun informasi tagihan ke Duitku (Diperbarui ke domain kustom .my.id)
         const requestBody = {
             merchantCode: MERCHANT_CODE,
             paymentAmount: Number(total),
@@ -39,7 +39,7 @@ exports.handler = async (event, context) => {
             productDetails: `Pesanan Unit Produksi SMK Yadika 13 (${idPesanan})`,
             email: "pembeli@smkyadika13.com", // Duitku wajib butuh email, kita buat statis saja
             customerVaName: nama || "Pelanggan",
-            returnUrl: "https://unitproduksismkyadika13.netlify.app", // Redirect pembeli setelah bayar
+            returnUrl: "https://unitproduksismkyadika13.my.id", // Redirect pembeli setelah bayar ke domain baru
             callbackUrl: "https://unitproduksismkyadika13.netlify.app/.netlify/functions/duitku-callback", 
             signature: signature,
             expiryPeriod: 60 // Waktu kadaluarsa (60 menit)
