@@ -1,85 +1,76 @@
 const crypto = require('crypto');
 
 exports.handler = async (event, context) => {
-    // Hanya izinkan metode POST dari website kita
+    // Hanya izinkan metode POST
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Metode tidak diizinkan' };
     }
 
     try {
-        // 1. Menerima data pesanan dari index.html
+        // 1. Menerima data pesanan dari frontend
         const data = JSON.parse(event.body);
         const { idPesanan, total, nama } = data;
 
         // ====================================================================
-        // KREDENSIAL DOKU LIVE (PRODUKSI)
+        // KREDENSIAL DUITKU (DAPATKAN DI DASHBOARD DUITKU -> INTEGRASI)
         // ====================================================================
-        const CLIENT_ID = 'BRN-0243-1788663032393';
-        const SECRET_KEY = 'SK-QsyHcfr32V860Emcub52';
+        const MERCHANT_CODE = 'DS35495'; // Contoh: D12345
+        const API_KEY = '282b322af7228e1f7260160b2a96a715'; // Contoh: d22c830xxxxxxx
+        
+        // Ubah jadi "true" HANYA jika akun Duitku kamu sudah diverifikasi (Live)
+        const IS_PRODUCTION = false; 
         // ====================================================================
 
-        // URL Mode Live (Asli) DOKU
-        const targetPath = '/checkout/v1/payment';
-        const url = 'https://api.doku.com' + targetPath;
+        // Tentukan URL tujuan (Sandbox/Uji Coba vs Production/Asli)
+        const url = IS_PRODUCTION 
+            ? 'https://passport.duitku.com/webapi/api/merchant/v2/inquiry' // LIVE
+            : 'https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry'; // SANDBOX
 
-        // 2. Membuat data wajib untuk keamanan API DOKU
-        const requestId = crypto.randomUUID(); // Bikin ID acak
-        const timestamp = new Date().toISOString().slice(0, 19) + "Z"; // Waktu saat ini
+        // 2. Rumus Signature Keamanan Duitku: MD5(merchantCode + idPesanan + totalAmount + apiKey)
+        const amountStr = String(total);
+        const signatureString = MERCHANT_CODE + idPesanan + amountStr + API_KEY;
+        const signature = crypto.createHash('md5').update(signatureString).digest('hex');
 
-        // 3. Menyusun informasi tagihan yang akan dikirim ke DOKU
+        // 3. Menyusun informasi tagihan ke Duitku
         const requestBody = {
-            order: {
-                invoice_number: idPesanan,
-                amount: Number(total) // Memastikan total selalu berupa angka bulat
-            },
-            payment: {
-                payment_due_date: 60 // Waktu kadaluarsa link (60 menit)
-            },
-            customer: {
-                name: nama || "Pelanggan",
-                email: "pembeli@smkyadika13.com"
-            }
+            merchantCode: MERCHANT_CODE,
+            paymentAmount: Number(total),
+            merchantOrderId: idPesanan,
+            productDetails: `Pesanan Unit Produksi SMK Yadika 13 (${idPesanan})`,
+            email: "pembeli@smkyadika13.com", // Duitku wajib butuh email, kita buat statis saja
+            customerVaName: nama || "Pelanggan",
+            returnUrl: "https://unitproduksismkyadika13.netlify.app", // Redirect pembeli setelah bayar
+            callbackUrl: "https://unitproduksismkyadika13.netlify.app/.netlify/functions/duitku-callback", 
+            signature: signature,
+            expiryPeriod: 60 // Waktu kadaluarsa (60 menit)
         };
 
-        const bodyString = JSON.stringify(requestBody);
-
-        // 4. Membuat "Tanda Tangan Digital" (Signature) agar DOKU percaya ini dari kita
-        const digest = crypto.createHash('sha256').update(bodyString).digest('base64');
-        const signatureComponent = `Client-Id:${CLIENT_ID}\nRequest-Id:${requestId}\nRequest-Timestamp:${timestamp}\nRequest-Target:${targetPath}\nDigest:${digest}`;
-        const signature = crypto.createHmac('sha256', SECRET_KEY).update(signatureComponent).digest('base64');
-
-        // 5. Mengirim permintaan (Request) ke Server DOKU Live
+        // 4. Mengirim permintaan ke server Duitku
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Client-Id': CLIENT_ID,
-                'Request-Id': requestId,
-                'Request-Timestamp': timestamp,
-                'Signature': 'HMACSHA256=' + signature
-            },
-            body: bodyString
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
         });
 
-        const dokuResult = await response.json();
+        const result = await response.json();
 
-        // 6. Mengecek apakah DOKU berhasil membalas dengan memberikan Link Pembayaran
-        if (dokuResult.response && dokuResult.response.payment && dokuResult.response.payment.url) {
+        // 5. Cek apakah Duitku berhasil membalas dengan status "00" (Sukses)
+        if (result.statusCode === "00" && result.paymentUrl) {
             return {
                 statusCode: 200,
                 body: JSON.stringify({ 
                     success: true, 
-                    payment_url: dokuResult.response.payment.url 
+                    payment_url: result.paymentUrl 
                 })
             };
         } else {
-            console.error("DOKU Live Error Response:", JSON.stringify(dokuResult));
+            console.error("Duitku Error Response:", JSON.stringify(result));
             return {
                 statusCode: 400,
                 body: JSON.stringify({ 
                     success: false, 
-                    message: "Gagal mendapatkan link dari DOKU", 
-                    detail: dokuResult 
+                    message: result.statusMessage || "Gagal mendapatkan link dari Duitku", 
+                    detail: result 
                 })
             };
         }
