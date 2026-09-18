@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const DOKU_URL = 'https://api-sandbox.doku.com/checkout/v1/payment';
+const DOKU_URL = 'https://api.doku.com/checkout/v1/payment';
 const DOKU_REQUEST_TARGET = '/checkout/v1/payment';
 
 function buatDigest(rawBody) {
