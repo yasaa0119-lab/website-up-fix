@@ -10,8 +10,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,450;9..144,560;9..144,650&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PUSTAKA MD5 UNTUK ENKRIPSI DUITKU DI BROWSER -->
-    <script src="https://cdn.jsdelivr.net/npm/blueimp-md5@2.19.0/js/md5.min.js"></script>
     <style>
         :root {
             --paper: #FCF7F8;
@@ -1069,7 +1067,7 @@
             prosesPembayaranQRIS();
         }
 
-        // FUNGSI UTAMA PEMBAYARAN DOKU (MURNI CLIENT-SIDE / BROWSER)
+        // FUNGSI UTAMA PEMBAYARAN DOKU (TERHUBUNG KE SERVER VERCEL)
         async function prosesPembayaranQRIS() {
             const nama = document.getElementById("inputNama").value.trim();
             const tingkat = document.getElementById("inputTingkat").value;
@@ -1088,60 +1086,61 @@
             
             activeOrder = { idPesanan: noPesanan, nama, kelas: kelasLengkap, catatan, items: [...cart], total, status: "Menunggu Pembayaran", paymentUrl: "" };
 
-            // Ubah tampilan modal jadi "Loading"
             document.getElementById("checkoutModal").innerHTML = `
                 <div class="modal-content" style="max-width: 420px; text-align: center;">
                     <h3><i class="fa-solid fa-spinner fa-spin"></i> Memproses...</h3>
-                    <p>Sedang membuat tagihan pembayaran otomatis...</p>
+                    <p>Sedang membuat tagihan pembayaran otomatis dari DOKU...</p>
                 </div>
             `;
 
             try {
-                const MERCHANT_CODE = 'DS35495';
-                const API_KEY = '282b322af7228e1f7260160b2a96a715';
-                const paymentAmount = Number(total);
-                const merchantOrderId = noPesanan;
-
-                // Membuat signature menggunakan library md5 yang dimuat di head
-                const signatureString = MERCHANT_CODE + merchantOrderId + paymentAmount + API_KEY;
-                const signature = md5(signatureString);
-
-                const requestBody = {
-                    merchantCode: MERCHANT_CODE,
-                    paymentAmount: paymentAmount,
-                    merchantOrderId: merchantOrderId,
-                    productDetails: `Pesanan Unit Produksi SMK Yadika 13 (${merchantOrderId})`,
-                    email: "pembeli@smkyadika13.com",
-                    customerVaName: nama || "Pelanggan",
-                    returnUrl: "https://unitproduksismkyadika13.my.id",
-                    callbackUrl: "https://unitproduksismkyadika13.my.id",
-                    signature: signature,
-                    expiryPeriod: 60
-                };
-
-                const response = await fetch('https://sandbox.duitku.com/webapi/api/merchant/v2/inquiry', {
+                // Memanggil API Vercel Serverless kita sendiri
+                const response = await fetch('/api/buat-pembayaran', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify({
+                        idPesanan: noPesanan,
+                        total: total,
+                        nama: nama,
+                        kelas: kelasLengkap,
+                        catatan: catatan,
+                        items: cart
+                    })
                 });
 
                 const result = await response.json();
 
-                if (result.statusCode === "00" && result.paymentUrl) {
-                    activeOrder.paymentUrl = result.paymentUrl;
+                if (result.success && result.payment_url) {
+                    // Simpan pesanan awal ke Firestore
+                    if (window.fbReady) {
+                        const { doc, setDoc, serverTimestamp } = window.fbFns;
+                        await setDoc(doc(window.fbDb, "pesanan", noPesanan), {
+                            idPesanan: noPesanan,
+                            nama: nama,
+                            kelas: kelasLengkap,
+                            catatan: catatan,
+                            items: cart,
+                            total: total,
+                            status: "Menunggu Pembayaran",
+                            paymentUrl: result.payment_url,
+                            waktu: serverTimestamp()
+                        });
+                    }
+
+                    activeOrder.paymentUrl = result.payment_url;
                     saveLS("up_activeOrder", activeOrder); 
                     cart = []; 
                     saveAndSync();
                     
-                    window.location.href = result.paymentUrl;
+                    window.location.href = result.payment_url;
                 } else {
-                    alert("Gagal membuat tagihan Duitku: " + (result.statusMessage || "Kesalahan sistem"));
+                    alert("Gagal membuat tagihan: " + (result.message || "Kesalahan sistem"));
                     kembaliKeKatalog();
                 }
 
             } catch (error) {
                 console.error(error);
-                alert("Terjadi kendala koneksi saat menghubungi Duitku.");
+                alert("Terjadi kendala koneksi.");
                 kembaliKeKatalog();
             }
         }
