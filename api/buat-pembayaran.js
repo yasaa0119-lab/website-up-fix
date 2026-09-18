@@ -1,4 +1,19 @@
 import crypto from 'crypto';
+import admin from 'firebase-admin';
+
+// Inisialisasi Firebase Admin
+if (!admin.apps.length) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+  } catch (e) {
+    console.error("Gagal inisialisasi Firebase:", e);
+  }
+}
+
+const db = admin.apps.length ? admin.firestore() : null;
 
 const DOKU_URL = 'https://api.doku.com/checkout/v1/payment';
 const DOKU_REQUEST_TARGET = '/checkout/v1/payment';
@@ -26,8 +41,10 @@ export default async function handler(req, res) {
 
   try {
     const { idPesanan, total, nama, catatan, items } = req.body || {};
-    const clientId = process.env.DOKU_CLIENT_ID;
-    const secretKey = process.env.DOKU_SECRET_KEY;
+    
+    // Kunci DOKU Live langsung di-hardcode agar stabil
+    const clientId = 'BRN-0243-1788663032393';
+    const secretKey = 'MASUKKAN_SECRET_KEY_KAMU_DISINI'; // Ganti dengan Secret Key lengkapmu dari dashboard DOKU
 
     if (!clientId || !secretKey) {
       return res.status(500).json({ success: false, message: 'Konfigurasi server belum lengkap' });
@@ -66,11 +83,30 @@ export default async function handler(req, res) {
 
     const result = await dokuRes.json();
     if (dokuRes.ok && result?.response?.payment?.url) {
+      // Simpan riwayat pesanan ke Firestore jika database aktif
+      if (db) {
+        try {
+          await db.collection('pesanan').doc(String(idPesanan)).set({
+            idPesanan,
+            total,
+            nama,
+            catatan,
+            items,
+            status: 'PENDING',
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        } catch (dbErr) {
+          console.error("Gagal simpan ke Firestore:", dbErr);
+        }
+      }
+
       return res.status(200).json({ success: true, payment_url: result.response.payment.url });
     }
 
+    console.error("DOKU Error Response:", result);
     return res.status(400).json({ success: false, message: 'Gagal membuat tagihan DOKU' });
   } catch (err) {
+    console.error("Server Error:", err);
     return res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 }
