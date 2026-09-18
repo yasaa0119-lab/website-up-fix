@@ -19,69 +19,38 @@ function buatSignature({ clientId, requestId, timestamp, requestTarget, digest, 
   return `HMACSHA256=${hmac}`;
 }
 
-function timestampDoku() {
-  return new Date().toISOString().split('.')[0] + 'Z';
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 
   try {
-    const { idPesanan, total, nama, kelas, catatan, items } = req.body || {};
-
+    const { idPesanan, total, nama, catatan, items } = req.body || {};
     const clientId = process.env.DOKU_CLIENT_ID;
     const secretKey = process.env.DOKU_SECRET_KEY;
 
     if (!clientId || !secretKey) {
-      console.error('DOKU_CLIENT_ID / DOKU_SECRET_KEY belum diset di Environment Variables Vercel');
-      return res.status(500).json({ success: false, message: 'Konfigurasi server pembayaran belum lengkap' });
+      return res.status(500).json({ success: false, message: 'Konfigurasi server belum lengkap' });
     }
-
-    const paymentAmount = Math.round(Number(total));
-    const invoiceNumber = String(idPesanan);
-
-    const lineItems = (items || []).map((i) => ({
-      name: i.name,
-      price: Math.round(Number(i.price)),
-      quantity: i.qty,
-    }));
 
     const body = {
       order: {
-        invoice_number: invoiceNumber,
-        amount: paymentAmount,
+        invoice_number: String(idPesanan),
+        amount: Math.round(Number(total)),
         currency: 'IDR',
-        line_items: lineItems,
-        callback_url: process.env.DOKU_CALLBACK_URL,
-        callback_url_cancel: process.env.DOKU_CALLBACK_URL_CANCEL || process.env.DOKU_CALLBACK_URL,
+        line_items: (items || []).map(i => ({ name: i.name, price: Math.round(Number(i.price)), quantity: i.qty })),
+        callback_url: "https://unitproduksismkyadika13.my.id",
         auto_redirect: true,
       },
-      payment: {
-        payment_due_date: 60, // menit
-      },
-      customer: {
-        name: nama,
-        email: 'noreply@unitproduksismkyadika13.my.id',
-        phone: '081200000000',
-        address: catatan || '-',
-        country: 'ID',
-      },
+      payment: { payment_due_date: 60 },
+      customer: { name: nama, email: 'noreply@unitproduksismkyadika13.my.id', phone: '081200000000', address: catatan || '-', country: 'ID' }
     };
 
     const rawBody = JSON.stringify(body);
     const requestId = crypto.randomUUID();
-    const timestamp = timestampDoku();
+    const timestamp = new Date().toISOString().split('.')[0] + 'Z';
     const digest = buatDigest(rawBody);
-    const signature = buatSignature({
-      clientId,
-      requestId,
-      timestamp,
-      requestTarget: DOKU_REQUEST_TARGET,
-      digest,
-      secretKey,
-    });
+    const signature = buatSignature({ clientId, requestId, timestamp, requestTarget: DOKU_REQUEST_TARGET, digest, secretKey });
 
     const dokuRes = await fetch(DOKU_URL, {
       method: 'POST',
@@ -90,29 +59,18 @@ export default async function handler(req, res) {
         'Client-Id': clientId,
         'Request-Id': requestId,
         'Request-Timestamp': timestamp,
-        Signature: signature,
+        'Signature': signature,
       },
       body: rawBody,
     });
 
     const result = await dokuRes.json();
-
     if (dokuRes.ok && result?.response?.payment?.url) {
-      return res.status(200).json({
-        success: true,
-        payment_url: result.response.payment.url,
-        token_id: result.response.payment.token_id,
-        expired_date: result.response.payment.expired_date,
-      });
+      return res.status(200).json({ success: true, payment_url: result.response.payment.url });
     }
 
-    console.error('DOKU menolak transaksi:', result);
-    return res.status(200).json({
-      success: false,
-      message: (result?.message && result.message.join(', ')) || 'Gagal membuat tagihan DOKU',
-    });
+    return res.status(400).json({ success: false, message: 'Gagal membuat tagihan DOKU' });
   } catch (err) {
-    console.error('Server error saat membuat transaksi:', err);
-    return res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
+    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 }
