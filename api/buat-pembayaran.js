@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     
     // Kunci DOKU Live langsung di-hardcode agar stabil
     const clientId = 'BRN-0243-1788663032393';
-    const secretKey = 'MASUKKAN_SECRET_KEY_KAMU_DISINI'; // Ganti dengan Secret Key lengkapmu dari dashboard DOKU
+    const secretKey = 'SK-QsyHcfr32V860Emcub52'; // Ganti dengan Secret Key lengkapmu dari dashboard DOKU
 
     if (!clientId || !secretKey) {
       return res.status(500).json({ success: false, message: 'Konfigurasi server belum lengkap' });
