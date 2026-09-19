@@ -1,19 +1,4 @@
-import crypto from 'crypto';
-import admin from 'firebase-admin';
-
-// Inisialisasi Firebase Admin
-if (!admin.apps.length) {
-  try {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  } catch (e) {
-    console.error("Gagal inisialisasi Firebase:", e);
-  }
-}
-
-const db = admin.apps.length ? admin.firestore() : null;
+const crypto = require('crypto');
 
 const DOKU_URL = 'https://api.doku.com/checkout/v1/payment';
 const DOKU_REQUEST_TARGET = '/checkout/v1/payment';
@@ -34,7 +19,17 @@ function buatSignature({ clientId, requestId, timestamp, requestTarget, digest, 
   return `HMACSHA256=${hmac}`;
 }
 
-export default async function handler(req, res) {
+module.exports = async function(req, res) {
+  // Pengaturan CORS untuk mencegah error pemblokiran dari browser
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
@@ -42,9 +37,9 @@ export default async function handler(req, res) {
   try {
     const { idPesanan, total, nama, catatan, items } = req.body || {};
     
-    // Kunci DOKU Live langsung di-hardcode agar stabil
+    // Kunci DOKU Live (Hardcode)
     const clientId = 'BRN-0243-1788663032393';
-    const secretKey = 'SK-QsyHcfr32V860Emcub52'; // Ganti dengan Secret Key lengkapmu dari dashboard DOKU
+    const secretKey = 'SK-QsyHcfr32V860Emcub52';
 
     if (!clientId || !secretKey) {
       return res.status(500).json({ success: false, message: 'Konfigurasi server belum lengkap' });
@@ -67,7 +62,15 @@ export default async function handler(req, res) {
     const requestId = crypto.randomUUID();
     const timestamp = new Date().toISOString().split('.')[0] + 'Z';
     const digest = buatDigest(rawBody);
-    const signature = buatSignature({ clientId, requestId, timestamp, requestTarget: DOKU_REQUEST_TARGET, digest, secretKey });
+    
+    const signature = buatSignature({ 
+      clientId, 
+      requestId, 
+      timestamp, 
+      requestTarget: DOKU_REQUEST_TARGET, 
+      digest, 
+      secretKey 
+    });
 
     const dokuRes = await fetch(DOKU_URL, {
       method: 'POST',
@@ -82,24 +85,9 @@ export default async function handler(req, res) {
     });
 
     const result = await dokuRes.json();
+    
+    // Jika sukses, kembalikan URL pembayaran ke index.html
     if (dokuRes.ok && result?.response?.payment?.url) {
-      // Simpan riwayat pesanan ke Firestore jika database aktif
-      if (db) {
-        try {
-          await db.collection('pesanan').doc(String(idPesanan)).set({
-            idPesanan,
-            total,
-            nama,
-            catatan,
-            items,
-            status: 'PENDING',
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-        } catch (dbErr) {
-          console.error("Gagal simpan ke Firestore:", dbErr);
-        }
-      }
-
       return res.status(200).json({ success: true, payment_url: result.response.payment.url });
     }
 
@@ -109,4 +97,4 @@ export default async function handler(req, res) {
     console.error("Server Error:", err);
     return res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
-}
+};
