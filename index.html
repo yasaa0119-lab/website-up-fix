@@ -586,7 +586,7 @@
 
     <!-- MODAL CHECKOUT -->
     <div id="checkoutModal" class="modal">
-        <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-content" style="max-width: 420px;" id="checkoutModalContentBox">
             <h3>Data Pemesan</h3>
             <div class="input-group"><label>Nama Lengkap</label><input type="text" id="inputNama" placeholder="Masukkan nama Anda" autocomplete="off"></div>
             <div class="input-group"><label>Tingkat / Status</label><select id="inputTingkat" onchange="aturFormKelas()"><option value="X">Kelas X</option><option value="XI">Kelas XI</option><option value="XII">Kelas XII</option><option value="Guru">Guru</option></select></div>
@@ -1067,7 +1067,7 @@
             prosesPembayaranQRIS();
         }
 
-        // FUNGSI UTAMA PEMBAYARAN DOKU (TERHUBUNG KE SERVER VERCEL)
+        // FUNGSI UTAMA PEMBAYARAN PAKASIR (TERHUBUNG KE SERVER VERCEL)
         async function prosesPembayaranQRIS() {
             const nama = document.getElementById("inputNama").value.trim();
             const tingkat = document.getElementById("inputTingkat").value;
@@ -1086,12 +1086,14 @@
             
             activeOrder = { idPesanan: noPesanan, nama, kelas: kelasLengkap, catatan, items: [...cart], total, status: "Menunggu Pembayaran", paymentUrl: "" };
 
-            document.getElementById("checkoutModal").innerHTML = `
-                <div class="modal-content" style="max-width: 420px; text-align: center;">
+            // Tampilkan animasi memproses di modal checkout
+            const modalBox = document.getElementById("checkoutModalContentBox");
+            if (modalBox) {
+                modalBox.innerHTML = `
                     <h3><i class="fa-solid fa-spinner fa-spin"></i> Memproses...</h3>
                     <p>Sedang membuat tagihan pembayaran otomatis dari PAKASIR...</p>
-                </div>
-            `;
+                `;
+            }
 
             try {
                 // Memanggil API Vercel Serverless kita sendiri
@@ -1135,12 +1137,14 @@
                     window.location.href = result.payment_url;
                 } else {
                     alert("Gagal membuat tagihan: " + (result.message || "Kesalahan sistem"));
+                    document.getElementById("checkoutModal").classList.remove("open");
                     kembaliKeKatalog();
                 }
 
             } catch (error) {
                 console.error(error);
                 alert("Terjadi kendala koneksi.");
+                document.getElementById("checkoutModal").classList.remove("open");
                 kembaliKeKatalog();
             }
         }
@@ -1184,7 +1188,24 @@
             let itemsHTML = activeOrder.items.map(i => `<div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.85rem;"><span>${i.name} (x${i.qty})</span> <span>Rp ${(i.price * i.qty).toLocaleString('id-ID')}</span></div>`).join('');
 
             const statusLabel = activeOrder.status || "Diproses";
-            const btnLanjutBayar = activeOrder.paymentUrl ? `<a href="${activeOrder.paymentUrl}" target="_blank" style="flex: 1; background: #28a745; color: white; padding: 10px; border-radius: 8px; text-decoration: none; font-weight: bold; text-align: center; display: inline-block;">Lanjutkan Pembayaran</a>` : '';
+            const isLunas = statusLabel.toLowerCase().includes("lunas") || statusLabel.toLowerCase().includes("completed") || statusLabel.toLowerCase().includes("paid") || statusLabel.toLowerCase().includes("success");
+
+            let actionArea = "";
+            if (isLunas) {
+                actionArea = `
+                    <div style="background: var(--status-soft); color: var(--status); padding: 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-align: center; margin-top: 12px; border: 1px solid var(--line);">
+                        <i class="fa-solid fa-circle-check"></i> Pembayaran Anda sudah lunas, mohon untuk mengambil pesanan di UP.
+                    </div>
+                `;
+            } else {
+                const btnLanjutBayar = activeOrder.paymentUrl ? `<a href="${activeOrder.paymentUrl}" target="_blank" style="flex: 1; background: #28a745; color: white; padding: 10px; border-radius: 8px; text-decoration: none; font-weight: bold; text-align: center; display: inline-block;">Lanjutkan Pembayaran</a>` : '';
+                actionArea = `
+                    <div style="margin-top: 12px; display: flex; gap: 10px;">
+                        ${btnLanjutBayar}
+                        <button style="flex: 1; padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--accent); font-weight:700; cursor:pointer;" onclick="document.getElementById('cancelModal').classList.add('open')">Batalkan Pesanan</button>
+                    </div>
+                `;
+            }
 
             container.innerHTML = `
                 <div style="background:var(--paper); padding:16px; border-radius:12px; border:1px solid var(--line);">
@@ -1193,10 +1214,7 @@
                     <div style="font-weight:700; margin-bottom:8px; font-size:0.95rem;">Pemesan: ${activeOrder.nama} (${activeOrder.kelas})</div>
                     <div style="border-top:1px dashed var(--line); padding-top:10px; margin-top:10px;">${itemsHTML}</div>
                     <div style="font-weight:800; margin-top:12px; text-align:right; font-size:1.05rem; color:var(--accent); font-family:'Fraunces', serif;">Total: Rp ${activeOrder.total.toLocaleString('id-ID')}</div>
-                    <div style="margin-top: 12px; display: flex; gap: 10px;">
-                        ${btnLanjutBayar}
-                        <button style="flex: 1; padding:10px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--accent); font-weight:700; cursor:pointer;" onclick="document.getElementById('cancelModal').classList.add('open')">Batalkan Pesanan</i></button>
-                    </div>
+                    ${actionArea}
                 </div>
             `;
         }
@@ -1237,9 +1255,17 @@
 
         setTheme(currentTheme);
 
+        function toggleTheme() {
+            const newTheme = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+            setTheme(newTheme);
+        }
+
         // ===========================
 
         document.addEventListener("DOMContentLoaded", () => {
+            const checkoutModalEl = document.getElementById("checkoutModal");
+            if (checkoutModalEl) checkoutModalEl.classList.remove("open");
+
             renderCategories();
             filterProducts();
             updateCart();
