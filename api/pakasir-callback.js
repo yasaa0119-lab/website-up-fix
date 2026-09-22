@@ -14,40 +14,43 @@ module.exports = async function(req, res) {
 
   try {
     const data = req.body || {};
-    console.log("Webhook Pakasir diterima:", data);
+    console.log("Payload Webhook Pakasir diterima:", JSON.stringify(data));
 
-    // Menangkap parameter dari Pakasir v2
-    const orderId = data.order_id || data.external_id;
-    const status = data.status;
-    const amount = data.amount || data.total;
+    // Menangkap ID pesanan dan status dari berbagai variasi payload Pakasir v2
+    const orderId = data.order_id || data.external_id || data.trx_id;
+    const status = (data.status || "").toLowerCase();
+    const amount = data.amount || data.total || 0;
 
-    // Cek apakah status pembayaran dari Pakasir menyatakan sukses/lunas
-    if (status === 'completed' || status === 'paid' || status === 'Success' || status === 'berhasil') {
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: 'Order ID tidak ditemukan dalam payload' });
+    }
+
+    // Jika status dari Pakasir menyatakan lunas / berhasil / completed / paid
+    if (status === 'completed' || status === 'paid' || status === 'success' || status === 'berhasil') {
       const firebaseProjectId = "unit-produksi-smkyadika13";
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents/pesanan/${orderId}`;
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents/pesanan/${orderId}?updateMask.fieldPaths=status`;
 
+      // Payload untuk memperbarui field 'status' saja menjadi 'Lunas' di Firestore
       const firestorePayload = {
         fields: {
-          id: { stringValue: String(orderId || "UP-DEFAULT") },
-          status: { stringValue: "Lunas" },
-          total: { integerValue: Number(amount || 0) }
+          status: { stringValue: "Lunas" }
         }
       };
 
-      // Mengirim pembaruan status ke Firebase Firestore
-      await fetch(firestoreUrl, {
+      const fbResponse = await fetch(firestoreUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(firestorePayload)
       });
-      
-      console.log(`Pesanan ${orderId} berhasil diperbarui menjadi Lunas.`);
+
+      const fbResult = await fbResponse.text();
+      console.log("Respons update Firestore:", fbResult);
     }
 
-    return res.status(200).json({ success: true, message: "Webhook berhasil diproses" });
+    return res.status(200).json({ success: true, message: "Webhook sukses diproses" });
 
   } catch (err) {
-    console.error("Webhook Error:", err);
+    console.error("Webhook Error Keseluruhan:", err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
