@@ -16,35 +16,35 @@ module.exports = async function(req, res) {
     const data = req.body || {};
     console.log("Webhook Pakasir diterima:", data);
 
-    // Pakasir v2 mengirimkan informasi seperti order_id, status, amount, dll.
-    const { order_id, status, amount } = data;
+    // Menangkap parameter dari Pakasir v2
+    const orderId = data.order_id || data.external_id;
+    const status = data.status;
+    const amount = data.amount || data.total;
 
-    // Jika pembayaran sukses/completed, kita kirim data ke Firebase Firestore via REST API
-    if (status === 'completed' || status === 'paid' || status === 'Success') {
+    // Cek apakah status pembayaran dari Pakasir menyatakan sukses/lunas
+    if (status === 'completed' || status === 'paid' || status === 'Success' || status === 'berhasil') {
       const firebaseProjectId = "unit-produksi-smkyadika13";
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents/pesanan/${order_id}`;
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents/pesanan/${orderId}`;
 
-      // Format payload untuk Firebase Firestore REST API
       const firestorePayload = {
         fields: {
-          id: { stringValue: String(order_id || "UP-DEFAULT") },
+          id: { stringValue: String(orderId || "UP-DEFAULT") },
           status: { stringValue: "Lunas" },
-          total: { integerValue: Number(amount || 0) },
-          dibuat: { timestampValue: new Date().toISOString() }
+          total: { integerValue: Number(amount || 0) }
         }
       };
 
-      // Kirim update/create ke Firestore
+      // Mengirim pembaruan status ke Firebase Firestore
       await fetch(firestoreUrl, {
-        method: 'PATCH', // PATCH akan membuat atau memperbarui dokumen berdasarkan ID
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(firestorePayload)
       });
       
-      console.log(`Pesanan ${order_id} berhasil diupdate menjadi Lunas di Firebase.`);
+      console.log(`Pesanan ${orderId} berhasil diperbarui menjadi Lunas.`);
     }
 
-    return res.status(200).json({ success: true, message: "Webhook processed successfully" });
+    return res.status(200).json({ success: true, message: "Webhook berhasil diproses" });
 
   } catch (err) {
     console.error("Webhook Error:", err);
