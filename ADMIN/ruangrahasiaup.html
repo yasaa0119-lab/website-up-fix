@@ -130,7 +130,6 @@
             appId: "1:864805123263:web:b6a7ad0bf856202acbc20a"
         };
 
-        // Hanya email di bawah ini yang boleh masuk ke halaman admin
         const ALLOWED_EMAILS = ["arapmuhamad@gmail.com"];
 
         const app = initializeApp(firebaseConfig);
@@ -193,7 +192,7 @@
                 let actions = "";
                 if (status === "Diproses") {
                     actions = `
-                        <div style="font-size:0.72rem; color:var(--ink-soft); font-style:italic; margin-bottom:8px;"><i class="fa-solid fa-clock"></i> Menunggu konfirmasi pembayaran DOKU otomatis...</div>
+                        <div style="font-size:0.72rem; color:var(--ink-soft); font-style:italic; margin-bottom:8px;"><i class="fa-solid fa-clock"></i> Menunggu pembayaran selesai...</div>
                         <button class="btn-batal" onclick="batalkanPesanan('${o.id}')"><i class="fa-solid fa-xmark"></i> Batalkan</button>`;
                 } else if (status === "Lunas") {
                     actions = `
