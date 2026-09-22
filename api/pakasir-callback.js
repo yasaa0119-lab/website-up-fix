@@ -8,49 +8,47 @@ module.exports = async function(req, res) {
     return res.status(200).end();
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method not allowed' });
-  }
-
   try {
     const data = req.body || {};
-    console.log("Payload Webhook Pakasir diterima:", JSON.stringify(data));
+    console.log("LOG WEBHOOK PAKASIR:", JSON.stringify(data));
 
-    // Menangkap ID pesanan dan status dari berbagai variasi payload Pakasir v2
-    const orderId = data.order_id || data.external_id || data.trx_id;
-    const status = (data.status || "").toLowerCase();
-    const amount = data.amount || data.total || 0;
+    // Simpan mentah-mentah data webhook ke Firestore di koleksi 'webhook_logs' 
+    // agar kita bisa lihat apa yang dikirim Pakasir lewat Firebase Console
+    const firebaseProjectId = "unit-produksi-smkyadika13";
+    const logUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents/webhook_logs`;
 
-    if (!orderId) {
-      return res.status(400).json({ success: false, message: 'Order ID tidak ditemukan dalam payload' });
-    }
-
-    // Jika status dari Pakasir menyatakan lunas / berhasil / completed / paid
-    if (status === 'completed' || status === 'paid' || status === 'success' || status === 'berhasil') {
-      const firebaseProjectId = "unit-produksi-smkyadika13";
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents/pesanan/${orderId}?updateMask.fieldPaths=status`;
-
-      // Payload untuk memperbarui field 'status' saja menjadi 'Lunas' di Firestore
-      const firestorePayload = {
+    await fetch(logUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         fields: {
-          status: { stringValue: "Lunas" }
+          payload: { stringValue: JSON.stringify(data) },
+          waktu: { timestampValue: new Date().toISOString() }
         }
-      };
+      })
+    });
 
-      const fbResponse = await fetch(firestoreUrl, {
+    // Cari order ID dari berbagai kemungkinan nama field
+    const orderId = data.order_id || data.external_id || data.trx_id || data.reference;
+    const status = (data.status || "").toLowerCase();
+
+    if (orderId && (status === 'completed' || status === 'paid' || status === 'success' || status === 'berhasil')) {
+      const updateUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents/pesanan/${orderId}?updateMask.fieldPaths=status`;
+      
+      await fetch(updateUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(firestorePayload)
+        body: JSON.stringify({
+          fields: {
+            status: { stringValue: "Lunas" }
+          }
+        })
       });
-
-      const fbResult = await fbResponse.text();
-      console.log("Respons update Firestore:", fbResult);
     }
 
-    return res.status(200).json({ success: true, message: "Webhook sukses diproses" });
-
+    return res.status(200).json({ success: true });
   } catch (err) {
-    console.error("Webhook Error Keseluruhan:", err);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error("Error:", err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 };
