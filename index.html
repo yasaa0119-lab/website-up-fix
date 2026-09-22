@@ -1188,13 +1188,14 @@
             let itemsHTML = activeOrder.items.map(i => `<div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:0.85rem;"><span>${i.name} (x${i.qty})</span> <span>Rp ${(i.price * i.qty).toLocaleString('id-ID')}</span></div>`).join('');
 
             const statusLabel = activeOrder.status || "Diproses";
-            const isLunas = statusLabel.toLowerCase().includes("lunas") || statusLabel.toLowerCase().includes("completed") || statusLabel.toLowerCase().includes("paid") || statusLabel.toLowerCase().includes("success");
+            const sLower = statusLabel.toLowerCase();
+            const isLunasOrSelesai = sLower.includes("lunas") || sLower.includes("selesai") || sLower.includes("completed") || sLower.includes("paid") || sLower.includes("success");
 
             let actionArea = "";
-            if (isLunas) {
+            if (isLunasOrSelesai) {
                 actionArea = `
                     <div style="background: var(--status-soft); color: var(--status); padding: 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-align: center; margin-top: 12px; border: 1px solid var(--line);">
-                        <i class="fa-solid fa-circle-check"></i> Pembayaran Anda sudah lunas, mohon untuk mengambil pesanan di UP.
+                        <i class="fa-solid fa-circle-check"></i> Pembayaran Anda sudah lunas / pesanan selesai, mohon untuk mengambil pesanan di UP.
                     </div>
                 `;
             } else {
