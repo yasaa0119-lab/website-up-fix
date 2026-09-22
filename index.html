@@ -1189,13 +1189,20 @@
 
             const statusLabel = activeOrder.status || "Diproses";
             const sLower = statusLabel.toLowerCase();
-            const isLunasOrSelesai = sLower.includes("lunas") || sLower.includes("selesai") || sLower.includes("completed") || sLower.includes("paid") || sLower.includes("success");
+            const isSelesai = sLower.includes("selesai");
+            const isLunas = sLower.includes("lunas") || sLower.includes("completed") || sLower.includes("paid") || sLower.includes("success");
 
             let actionArea = "";
-            if (isLunasOrSelesai) {
+            if (isSelesai) {
+                actionArea = `
+                    <div style="background: var(--status-soft); color: var(--status); padding: 14px; border-radius: 8px; font-size: 0.9rem; font-weight: 700; text-align: center; margin-top: 12px; border: 1px solid var(--line);">
+                        <i class="fa-solid fa-face-smile-heart"></i> Terima kasih sudah memesan, pesanan telah selesai!
+                    </div>
+                `;
+            } else if (isLunas) {
                 actionArea = `
                     <div style="background: var(--status-soft); color: var(--status); padding: 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-align: center; margin-top: 12px; border: 1px solid var(--line);">
-                        <i class="fa-solid fa-circle-check"></i> Pembayaran Anda sudah lunas / pesanan selesai, mohon untuk mengambil pesanan di UP.
+                        <i class="fa-solid fa-circle-check"></i> Pembayaran Anda sudah lunas, mohon untuk mengambil pesanan di UP.
                     </div>
                 `;
             } else {
@@ -1272,6 +1279,13 @@
             updateCart();
             cekStatusBannerPesanan();
             if (activeOrder) pantauStatusPesanan(activeOrder.idPesanan);
+
+            // Auto-refresh data saat user kembali dari tab Pakasir
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "visible" && activeOrder) {
+                    pantauStatusPesanan(activeOrder.idPesanan);
+                }
+            });
         });
     </script>
 </body>
