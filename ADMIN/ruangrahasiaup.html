@@ -23,10 +23,6 @@
     .login-box { background: var(--surface); padding: 32px 28px; border-radius: 16px; border: 1px solid var(--line); width: 100%; max-width: 360px; box-shadow: 0 10px 30px rgba(217,107,132,0.08); }
     .login-box h1 { font-size: 1.3rem; margin-bottom: 4px; color: var(--ink); }
     .login-box p { font-size: 0.8rem; color: var(--ink-soft); margin-bottom: 20px; }
-    .input-group { margin-bottom: 14px; text-align: left; }
-    .input-group label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--ink-soft); margin-bottom: 6px; }
-    .input-group input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 0.9rem; outline: none; background: var(--paper); }
-    .input-group input:focus { border-color: var(--accent); }
     .btn-main { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: 0.2s; }
     .btn-main:hover { background: var(--accent-hover); }
     .login-error { color: var(--danger); font-size: 0.78rem; margin-top: 10px; min-height: 16px; }
@@ -118,7 +114,7 @@
             getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
         import {
-            getFirestore, collection, onSnapshot, doc, updateDoc, deleteDoc, orderBy, query
+            getFirestore, collection, onSnapshot, doc, updateDoc, deleteDoc
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -165,18 +161,34 @@
         };
 
         window.batalkanPesanan = function (idPesanan) {
-            if (!confirm("Batalkan & hapus pesanan ini? Tidak bisa dikembalikan.")) return;
-            deleteDoc(doc(db, "pesanan", idPesanan)).catch(e => alert("Gagal menghapus: " + e.message));
+            if (!confirm("Ubah status pesanan menjadi Dibatalkan?")) return;
+            updateDoc(doc(db, "pesanan", idPesanan), { status: "Dibatalkan" }).catch(e => alert("Gagal membatalkan: " + e.message));
         };
 
         function formatWaktu(ts) {
-            if (!ts || !ts.toDate) return "";
-            return ts.toDate().toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+            if (!ts) return "";
+            if (ts.toDate) {
+                return ts.toDate().toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+            }
+            return new Date(ts).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
         }
 
         function renderOrders() {
             const list = document.getElementById("orderList");
-            const filtered = currentFilter === "Semua" ? allOrders : allOrders.filter(o => (o.status || "Diproses") === currentFilter);
+
+            // Logika filter fleksibel untuk menangani berbagai format teks status
+            const filtered = allOrders.filter(o => {
+                const statusDb = (o.status || "Diproses").toLowerCase().trim();
+                const tab = currentFilter.toLowerCase().trim();
+
+                if (tab === "semua") return true;
+                if (tab === "diproses" && (statusDb.includes("proses") || statusDb.includes("menunggu") || statusDb === "pending")) return true;
+                if (tab === "lunas" && (statusDb.includes("lunas") || statusDb.includes("paid") || statusDb.includes("completed") || statusDb.includes("success"))) return true;
+                if (tab === "selesai" && (statusDb.includes("selesai") || statusDb.includes("finish"))) return true;
+                if (tab === "dibatalkan" && (statusDb.includes("batal") || statusDb.includes("cancel") || statusDb.includes("expired"))) return true;
+
+                return statusDb === tab;
+            });
 
             if (filtered.length === 0) {
                 list.innerHTML = `<div class="empty-state">Tidak ada pesanan di kategori ini.</div>`;
@@ -184,20 +196,39 @@
             }
 
             list.innerHTML = filtered.map(o => {
-                const status = o.status || "Diproses";
+                const rawStatus = o.status || "Diproses";
+                // Standarisasi tampilan badge agar rapi
+                let badgeClass = "Diproses";
+                let badgeText = rawStatus;
+                const sLower = rawStatus.toLowerCase();
+
+                if (sLower.includes("lunas") || sLower.includes("paid") || sLower.includes("completed")) {
+                    badgeClass = "Lunas"; badgeText = "Lunas";
+                } else if (sLower.includes("selesai") || sLower.includes("finish")) {
+                    badgeClass = "Selesai"; badgeText = "Selesai";
+                } else if (sLower.includes("batal") || sLower.includes("cancel") || sLower.includes("expired")) {
+                    badgeClass = "Dibatalkan"; badgeText = "Dibatalkan";
+                } else {
+                    badgeClass = "Diproses"; badgeText = "Diproses";
+                }
+
                 const itemsHTML = (o.items || []).map(i =>
                     `<div class="order-item-row"><span>${i.name} (x${i.qty})</span><span>Rp ${(i.price * i.qty).toLocaleString('id-ID')}</span></div>`
                 ).join("");
 
                 let actions = "";
-                if (status === "Diproses") {
+                if (badgeClass === "Diproses") {
                     actions = `
-                        <div style="font-size:0.72rem; color:var(--ink-soft); font-style:italic; margin-bottom:8px;"><i class="fa-solid fa-clock"></i> Menunggu pembayaran selesai...</div>
+                        <button class="btn-lunas" onclick="ubahStatus('${o.id}', 'Lunas')"><i class="fa-solid fa-check"></i> Tandai Lunas</button>
                         <button class="btn-batal" onclick="batalkanPesanan('${o.id}')"><i class="fa-solid fa-xmark"></i> Batalkan</button>`;
-                } else if (status === "Lunas") {
+                } else if (badgeClass === "Lunas") {
                     actions = `
                         <button class="btn-selesai" onclick="ubahStatus('${o.id}', 'Selesai')"><i class="fa-solid fa-box-open"></i> Tandai Selesai</button>
                         <button class="btn-batal" onclick="batalkanPesanan('${o.id}')"><i class="fa-solid fa-xmark"></i> Batalkan</button>`;
+                } else if (badgeClass === "Selesai") {
+                    actions = `<div style="font-size:0.75rem; color:var(--status); font-weight:600;"><i class="fa-solid fa-circle-check"></i> Pesanan telah selesai.</div>`;
+                } else {
+                    actions = `<div style="font-size:0.75rem; color:var(--danger); font-weight:600;"><i class="fa-solid fa-circle-xmark"></i> Pesanan dibatalkan.</div>`;
                 }
 
                 return `
@@ -207,25 +238,23 @@
                                 <div class="order-id">No. ${o.id}</div>
                                 <div class="order-time">${formatWaktu(o.dibuat)}</div>
                             </div>
-                            <span class="badge ${status}">${status}</span>
+                            <span class="badge ${badgeClass}">${badgeText}</span>
                         </div>
                         <div class="order-buyer">${o.nama || '-'}</div>
                         <div class="order-kelas">${o.kelas || '-'}</div>
                         ${o.catatan ? `<div class="order-note"><i class="fa-solid fa-note-sticky"></i> ${o.catatan}</div>` : ""}
                         <div class="order-items">${itemsHTML}</div>
                         <div class="order-total">Total: Rp ${(o.total || 0).toLocaleString('id-ID')}</div>
-                        ${actions ? `<div class="action-row">${actions}</div>` : ""}
+                        <div class="action-row">${actions}</div>
                     </div>
                 `;
             }).join("");
         }
 
-     function mulaiPantauPesanan() {
-            // Mengambil data pesanan tanpa orderBy agar tidak error jika ada field 'dibuat' yang kosong/berbeda format
+        function mulaiPantauPesanan() {
             const q = collection(db, "pesanan");
             unsub = onSnapshot(q, (snap) => {
                 allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                // Urutkan manual lewat JavaScript jika ada field dibuat
                 allOrders.sort((a, b) => {
                     let tA = a.dibuat?.toMillis ? a.dibuat.toMillis() : 0;
                     let tB = b.dibuat?.toMillis ? b.dibuat.toMillis() : 0;
