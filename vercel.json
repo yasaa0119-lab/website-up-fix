@@ -1,0 +1,6 @@
+{
+  "routes": [
+    { "src": "/ruangrahasiaup", "dest": "/ruangrahasiaup.html" },
+    { "handle": "filesystem" }
+  ]
+}
