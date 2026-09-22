@@ -1,5 +1,3 @@
-// Menggunakan Firebase Admin SDK atau langsung mencatat via fetch/client jika diperlukan,
-// atau kita tangkap data dari Pakasir v2.
 module.exports = async function(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,18 +13,38 @@ module.exports = async function(req, res) {
   }
 
   try {
-    const notification = req.body || {};
-    
-    // Pakasir mengirim data seperti order_id, status (completed/paid), amount, dll.
-    const { order_id, status, txn_id, amount } = notification;
+    const data = req.body || {};
+    console.log("Webhook Pakasir diterima:", data);
 
-    console.log("Notifikasi Webhook Pakasir diterima:", notification);
+    // Pakasir v2 mengirimkan informasi seperti order_id, status, amount, dll.
+    const { order_id, status, amount } = data;
 
-    // Di sini webhook menerima laporan sukses dari Pakasir.
-    // Karena halaman admin kamu (ruangrahasiaup.html) menggunakan Firebase Client SDK,
-    // pastikan status pesanan di database Firebase terupdate menjadi 'Lunas' ketika status dari Pakasir 'completed' atau 'paid'.
+    // Jika pembayaran sukses/completed, kita kirim data ke Firebase Firestore via REST API
+    if (status === 'completed' || status === 'paid' || status === 'Success') {
+      const firebaseProjectId = "unit-produksi-smkyadika13";
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents/pesanan/${order_id}`;
 
-    return res.status(200).json({ success: true, message: "Webhook diterima" });
+      // Format payload untuk Firebase Firestore REST API
+      const firestorePayload = {
+        fields: {
+          id: { stringValue: String(order_id || "UP-DEFAULT") },
+          status: { stringValue: "Lunas" },
+          total: { integerValue: Number(amount || 0) },
+          dibuat: { timestampValue: new Date().toISOString() }
+        }
+      };
+
+      // Kirim update/create ke Firestore
+      await fetch(firestoreUrl, {
+        method: 'PATCH', // PATCH akan membuat atau memperbarui dokumen berdasarkan ID
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(firestorePayload)
+      });
+      
+      console.log(`Pesanan ${order_id} berhasil diupdate menjadi Lunas di Firebase.`);
+    }
+
+    return res.status(200).json({ success: true, message: "Webhook processed successfully" });
 
   } catch (err) {
     console.error("Webhook Error:", err);
