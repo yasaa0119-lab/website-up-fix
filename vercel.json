@@ -1,7 +1,6 @@
 {
-  "functions": {
-    "api/pakasir-callback.js": {
-      "maxDuration": 10
-    }
-  }
+  "rewrites": [
+    { "source": "/admin", "destination": "/ADMIN/ruangrahasiaup.html" },
+    { "source": "/ruangrahasiaup", "destination": "/ADMIN/ruangrahasiaup.html" }
+  ]
 }
