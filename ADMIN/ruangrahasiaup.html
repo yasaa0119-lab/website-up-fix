@@ -220,10 +220,17 @@
             }).join("");
         }
 
-        function mulaiPantauPesanan() {
-            const q = query(collection(db, "pesanan"), orderBy("dibuat", "desc"));
+     function mulaiPantauPesanan() {
+            // Mengambil data pesanan tanpa orderBy agar tidak error jika ada field 'dibuat' yang kosong/berbeda format
+            const q = collection(db, "pesanan");
             unsub = onSnapshot(q, (snap) => {
                 allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Urutkan manual lewat JavaScript jika ada field dibuat
+                allOrders.sort((a, b) => {
+                    let tA = a.dibuat?.toMillis ? a.dibuat.toMillis() : 0;
+                    let tB = b.dibuat?.toMillis ? b.dibuat.toMillis() : 0;
+                    return tB - tA;
+                });
                 renderOrders();
             }, (err) => {
                 document.getElementById("orderList").innerHTML = `<div class="empty-state">Gagal memuat data: ${err.message}</div>`;
