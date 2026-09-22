@@ -1,6 +1,7 @@
 {
-  "routes": [
-    { "src": "/ruangrahasiaup", "dest": "/ruangrahasiaup.html" },
-    { "handle": "filesystem" }
-  ]
+  "functions": {
+    "api/pakasir-callback.js": {
+      "maxDuration": 10
+    }
+  }
 }

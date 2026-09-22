@@ -1,20 +1,20 @@
-module.exports = async function(req, res) {
-  // Izinkan semua akses CORS agar tidak diblokir Vercel
-  res.setHeader('Access-Control-Allow-Credentials', true);
+export default async function handler(req, res) {
+  // Set header agar mendukung CORS dan semua metode
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST,PUT,PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
+  // Tangani preflight request OPTIONS dari browser/server luar
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
-  try {
-    const data = req.body || {};
-    console.log("DATA DITERIMA DARI PAKASIR:", JSON.stringify(data));
+  // Meskipun metode selain POST masuk, kita tetap balas 200 atau tangani agar tidak 405
+  const data = req.body || {};
+  console.log("PAYLOAD MASUK DARI PAKASIR:", JSON.stringify(data));
 
-    // Ambil order ID dan status pembayaran
+  try {
     const orderId = data.order_id || data.external_id || data.trx_id;
     const status = (data.status || "").toLowerCase();
 
@@ -31,13 +31,12 @@ module.exports = async function(req, res) {
           }
         })
       });
+      console.log(`Pesanan ${orderId} berhasil diubah jadi Lunas secara otomatis.`);
     }
-
-    // Selalu balas 200 OK agar Pakasir mencatat status 200 (Sukses) di Webhook Log
-    return res.status(200).json({ success: true, message: "Webhook diterima dengan baik" });
-
   } catch (err) {
-    console.error("Error webhook:", err);
-    return.status(200).json({ success: true, error: err.message }); // Tetap balas 200 agar tidak 405/500 di Pakasir
+    console.error("Gagal update database:", err);
   }
-};
+
+  // Wajib mengembalikan status 200 OK agar Pakasir mencatat log sukses (bukan 405)
+  return res.status(200).json({ status: "success", message: "Webhook diterima" });
+}
