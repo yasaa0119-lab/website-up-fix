@@ -681,7 +681,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
         import {
-            getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, collection
+            getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, collection, increment
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -697,7 +697,7 @@
         const db = getFirestore(app);
 
         window.fbDb = db;
-        window.fbFns = { doc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, collection };
+        window.fbFns = { doc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, collection, increment };
         window.fbReady = true;
         document.dispatchEvent(new Event("firebase-ready"));
     </script>
@@ -1392,7 +1392,8 @@
 
                 if (result.success && result.payment_url) {
                     if (window.fbReady) {
-                        const { doc, setDoc, serverTimestamp } = window.fbFns;
+                        const { doc, setDoc, updateDoc, serverTimestamp, increment } = window.fbFns;
+                        
                         await setDoc(doc(window.fbDb, "pesanan", noPesanan), {
                             idPesanan: noPesanan,
                             nama: nama,
@@ -1404,6 +1405,16 @@
                             paymentUrl: result.payment_url,
                             waktu: serverTimestamp()
                         });
+
+                        // POTONG STOK OTOMATIS
+                        for (let barang of cart) {
+                            if (realtimeStocks.hasOwnProperty(barang.id)) {
+                                const refStok = doc(window.fbDb, "stok_produk", String(barang.id));
+                                await updateDoc(refStok, {
+                                    sisa: increment(-barang.qty)
+                                }).catch(err => console.log("Gagal potong stok:", err));
+                            }
+                        }
                     }
 
                     activeOrder.paymentUrl = result.payment_url;
