@@ -547,8 +547,8 @@
                         <div class="floating-badge badge-2">
                             <div class="badge-icon" style="background: var(--status-soft); color: var(--status);"><i class="fa-solid fa-bolt"></i></div>
                             <div>
-                                <div style="font-size: 0.65rem; color: var(--ink-soft); text-transform: uppercase;">Penyiapan</div>
-                                <div>Instan</div>
+                                <div style="font-size: 0.65rem; color: var(--ink-soft); text-transform: uppercase;">Pengiriman</div>
+                                <div>Instan ke Kelas</div>
                             </div>
                         </div>
                     </div>
@@ -812,7 +812,7 @@
         }
 
         products.forEach(p => { 
-            if(!p.desc) { p.desc = `Produk ${p.name} berkualitas terbaik dari Unit Produksi SMK Yadika 13. Dapatkan sekarang melalui katalog kami.`; }
+            if(!p.desc) { p.desc = `Produk ${p.name} berkualitas terbaik dari Unit Produksi SMK Yadika 13. Dapatkan sekarang melalui katalog eksklusif kami.`; }
         });
 
         function loadLS(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; } }
@@ -1450,7 +1450,8 @@
                 if (activeOrder && activeOrder.idPesanan === idPesanan && data.status !== activeOrder.status) {
                     activeOrder.status = data.status;
                     saveLS("up_activeOrder", activeOrder);
-                    renderActiveOrder();
+                    renderActiveOrder(); // Update UI Halaman Detail
+                    cekStatusBannerPesanan(); // Update UI Banner di Beranda
                     showToast(`Status: ${data.status}`);
                 }
             });
@@ -1522,7 +1523,31 @@
 
         function cekStatusBannerPesanan() {
             const banner = document.getElementById("banner-pesanan-aktif");
-            if (banner) banner.style.display = activeOrder ? "flex" : "none";
+            if (!banner) return;
+            
+            if (activeOrder) {
+                banner.style.display = "flex";
+                const title = banner.querySelector(".banner-title");
+                const subtitle = banner.querySelector(".banner-subtitle");
+                const icon = banner.querySelector(".banner-icon-wrapper i");
+                const sLower = (activeOrder.status || "").toLowerCase();
+                
+                if (sLower.includes("selesai")) {
+                    if (title) title.innerText = "Pesanan sudah diambil!";
+                    if (subtitle) subtitle.innerText = "Terima kasih sudah memesan.";
+                    if (icon) icon.className = "fa-solid fa-face-smile-heart";
+                } else if (sLower.includes("lunas") || sLower.includes("paid") || sLower.includes("success")) {
+                    if (title) title.innerText = "Pembayaran Lunas!";
+                    if (subtitle) subtitle.innerText = "Silakan ambil pesanan di UP.";
+                    if (icon) icon.className = "fa-solid fa-circle-check";
+                } else {
+                    if (title) title.innerText = "Pesanan sedang disiapkan!";
+                    if (subtitle) subtitle.innerText = "Klik di sini untuk melihat status real-time";
+                    if (icon) icon.className = "fa-solid fa-box-open";
+                }
+            } else {
+                banner.style.display = "none";
+            }
         }
 
         function konfirmasiBatalkanPesanan() {
