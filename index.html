@@ -547,8 +547,8 @@
                         <div class="floating-badge badge-2">
                             <div class="badge-icon" style="background: var(--status-soft); color: var(--status);"><i class="fa-solid fa-bolt"></i></div>
                             <div>
-                                <div style="font-size: 0.65rem; color: var(--ink-soft); text-transform: uppercase;">Pengiriman</div>
-                                <div>Instan ke Kelas</div>
+                                <div style="font-size: 0.65rem; color: var(--ink-soft); text-transform: uppercase;">Penyiapan</div>
+                                <div>Instan</div>
                             </div>
                         </div>
                     </div>
@@ -812,7 +812,7 @@
         }
 
         products.forEach(p => { 
-            if(!p.desc) { p.desc = `Produk ${p.name} berkualitas terbaik dari Unit Produksi SMK Yadika 13. Dapatkan sekarang melalui katalog eksklusif kami.`; }
+            if(!p.desc) { p.desc = `Produk ${p.name} berkualitas terbaik dari Unit Produksi SMK Yadika 13. Dapatkan sekarang melalui katalog kami.`; }
         });
 
         function loadLS(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; } }
