@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="Katalog belanja online Unit Produksi SMK Yadika 13 - pesan langsung, bayar otomatis via PAKASIR.">
-   <link rel="icon" href="gambar/smkyadika.png" type="image/png">
+    <link rel="icon" href="gambar/smkyadika.png" type="image/png">
     <title>Unit Produksi SMK Yadika 13</title>
     
     <!-- Pro Typography: Fraunces (Editorial) & Manrope (Modern Clean) -->
@@ -28,7 +28,7 @@
             --line: #F2DCE2;
             --status: #D96B84;
             --status-soft: #FCE8EE;
-            --danger: #FF4D4D; /* Warna peringatan/stok habis */
+            --danger: #FF4D4D;
             
             --indicator-bg: #4A3B40;
             --indicator-text: #FFFFFF;
@@ -1391,32 +1391,8 @@
                 const result = await response.json();
 
                 if (result.success && result.payment_url) {
-                    if (window.fbReady) {
-                        const { doc, setDoc, updateDoc, serverTimestamp, increment } = window.fbFns;
-                        
-                        await setDoc(doc(window.fbDb, "pesanan", noPesanan), {
-                            idPesanan: noPesanan,
-                            nama: nama,
-                            kelas: kelasLengkap,
-                            catatan: catatan,
-                            items: cart,
-                            total: total,
-                            status: "Menunggu Pembayaran",
-                            paymentUrl: result.payment_url,
-                            waktu: serverTimestamp()
-                        });
-
-                        // POTONG STOK OTOMATIS
-                        for (let barang of cart) {
-                            if (realtimeStocks.hasOwnProperty(barang.id)) {
-                                const refStok = doc(window.fbDb, "stok_produk", String(barang.id));
-                                await updateDoc(refStok, {
-                                    sisa: increment(-barang.qty)
-                                }).catch(err => console.log("Gagal potong stok:", err));
-                            }
-                        }
-                    }
-
+                    // Firebase setDoc & updateDoc DIHAPUS. Backend Vercel yang ngerjain.
+                    
                     activeOrder.paymentUrl = result.payment_url;
                     saveLS("up_activeOrder", activeOrder); 
                     cart = []; 
