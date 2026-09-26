@@ -14,7 +14,7 @@ module.exports = async function(req, res) {
     const PAKASIR_API_KEY = 'dM7z54vGvIom2hGRLUOFVZSUE8RyMvW0';
     const PROJECT_SLUG = 'unitproduksi';
 
-    // 1. Buat transaksi ke Pakasir
+    // Buat transaksi ke Pakasir
     const PAKASIR_URL = `https://app.pakasir.com/api/v2/create-transaction/${PROJECT_SLUG}/${idPesanan}`;
     const response = await fetch(PAKASIR_URL, {
       method: 'POST',
@@ -31,7 +31,7 @@ module.exports = async function(req, res) {
     const result = await response.json();
     
     if (result && result.payment_link) {
-      // 2. Simpan pesanan ke Firestore via REST API (Tanpa Firebase Admin SDK yang ribet)
+      // Simpan pesanan ke Firestore via REST API (Aman di backend, tanpa modul ribet)
       const projectId = process.env.FIREBASE_PROJECT_ID;
       if (projectId) {
         const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/pesanan/${idPesanan}`;
@@ -47,8 +47,7 @@ module.exports = async function(req, res) {
               catatan: { stringValue: String(catatan || '') },
               total: { doubleValue: Number(total) },
               status: { stringValue: "Menunggu Pembayaran" },
-              paymentUrl: { stringValue: String(result.payment_link) },
-              waktu: { timestampValue: new Date().toISOString() }
+              paymentUrl: { stringValue: String(result.payment_link) }
             }
           })
         });
@@ -64,6 +63,6 @@ module.exports = async function(req, res) {
 
   } catch (err) {
     console.error("Server Error:", err);
-    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server: ' + err.message });
+    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 };
