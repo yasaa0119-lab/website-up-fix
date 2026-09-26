@@ -1,5 +1,4 @@
 module.exports = async function(req, res) {
-  // Pengaturan CORS agar tidak diblokir browser
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -10,27 +9,13 @@ module.exports = async function(req, res) {
   }
 
   try {
-    // Import firebase-admin secara dinamis untuk menghindari gagal load modul
-    const admin = await import('firebase-admin');
-
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: process.env.FIREBASE_PROJECT_ID,
-                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, '\n'),
-            })
-        });
-    }
-    const db = admin.firestore();
-
     const { idPesanan, total, nama, kelas, catatan, items } = req.body || {};
     
     const PAKASIR_API_KEY = 'dM7z54vGvIom2hGRLUOFVZSUE8RyMvW0';
     const PROJECT_SLUG = 'unitproduksi';
 
+    // 1. Buat transaksi ke Pakasir
     const PAKASIR_URL = `https://app.pakasir.com/api/v2/create-transaction/${PROJECT_SLUG}/${idPesanan}`;
-
     const response = await fetch(PAKASIR_URL, {
       method: 'POST',
       headers: {
@@ -46,38 +31,39 @@ module.exports = async function(req, res) {
     const result = await response.json();
     
     if (result && result.payment_link) {
-      const batch = db.batch(); 
-      
-      const orderRef = db.collection('pesanan').doc(idPesanan);
-      batch.set(orderRef, {
-          idPesanan, nama, kelas, catatan, items, total,
-          status: "Menunggu Pembayaran",
-          paymentUrl: result.payment_link,
-          waktu: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      if (items && items.length > 0) {
-          items.forEach(barang => {
-              const stokRef = db.collection('stok_produk').doc(String(barang.id));
-              batch.update(stokRef, {
-                  sisa: admin.firestore.FieldValue.increment(-barang.qty)
-              });
-          });
+      // 2. Simpan pesanan ke Firestore via REST API (Tanpa Firebase Admin SDK yang ribet)
+      const projectId = process.env.FIREBASE_PROJECT_ID;
+      if (projectId) {
+        const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/pesanan/${idPesanan}`;
+        
+        await fetch(firestoreUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: {
+              idPesanan: { stringValue: String(idPesanan) },
+              nama: { stringValue: String(nama || '') },
+              kelas: { stringValue: String(kelas || '') },
+              catatan: { stringValue: String(catatan || '') },
+              total: { doubleValue: Number(total) },
+              status: { stringValue: "Menunggu Pembayaran" },
+              paymentUrl: { stringValue: String(result.payment_link) },
+              waktu: { timestampValue: new Date().toISOString() }
+            }
+          })
+        });
       }
-
-      await batch.commit();
 
       return res.status(200).json({
         success: true,
-        payment_link: result.payment_link
+        payment_url: result.payment_link
       });
     }
 
-    console.error("Error dari Pakasir:", result);
     return res.status(400).json({ success: false, message: 'Gagal membuat tagihan di Pakasir' });
 
   } catch (err) {
     console.error("Server Error:", err);
-    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server Vercel: ' + err.message });
+    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server: ' + err.message });
   }
 };
