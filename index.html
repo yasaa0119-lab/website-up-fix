@@ -7,12 +7,10 @@
    <link rel="icon" href="gambar/smkyadika.png" type="image/png">
     <title>Unit Produksi SMK Yadika 13</title>
     
-    <!-- Pro Typography: Fraunces (Editorial) & Manrope (Modern Clean) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Font Awesome & AOS CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
     
@@ -1281,8 +1279,8 @@
             prosesPembayaranQRIS();
         }
 
-        // FUNGSI PEMBAYARAN MENGGUNAKAN FORM REDIRECT (BEBAS CORS)
-        function prosesPembayaranQRIS() {
+        // FUNGSI PEMBAYARAN MENGGUNAKAN BACKEND VERCEL SERVERLESS AGAR AMAN DAN TIDAK KENA 403 / CORS
+        async function prosesPembayaranQRIS() {
             const nama = document.getElementById("inputNama").value.trim();
             const tingkat = document.getElementById("inputTingkat").value;
             const jurusan = document.getElementById("inputJurusan").value;
@@ -1298,64 +1296,87 @@
 
             const noPesanan = `UP-${Date.now().toString().slice(-6)}`;
             
-            activeOrder = { idPesanan: noPesanan, nama, kelas: kelasLengkap, catatan, items: [...cart], total, status: "Menunggu Pembayaran", paymentUrl: "" };
-
-            const PAKASIR_API_KEY = 'cfU4UEgD06yFzcqwBBZ6vPAl09v1qp94';
-            const PROJECT_SLUG = 'unitproduksi2';
-
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = `https://app.pakasir.com/api/v2/create-transaction/${PROJECT_SLUG}/${noPesanan}`;
-
-            const inputKey = document.createElement('input');
-            inputKey.type = 'hidden';
-            inputKey.name = 'x_api_key';
-            inputKey.value = PAKASIR_API_KEY;
-            form.appendChild(inputKey);
-
-            const inputAmount = document.createElement('input');
-            inputAmount.type = 'hidden';
-            inputAmount.name = 'amount';
-            inputAmount.value = Math.round(Number(total));
-            form.appendChild(inputAmount);
-
-            const inputMethod = document.createElement('input');
-            inputMethod.type = 'hidden';
-            inputMethod.name = 'method';
-            inputMethod.value = 'payment_link';
-            form.appendChild(inputMethod);
-
-            document.body.appendChild(form);
-
-            if (window.fbReady) {
-                const { doc, setDoc, updateDoc, serverTimestamp, increment } = window.fbFns;
-                
-                setDoc(doc(window.fbDb, "pesanan", noPesanan), {
-                    idPesanan: noPesanan,
-                    nama: nama,
-                    kelas: kelasLengkap,
-                    catatan: catatan,
-                    items: cart,
-                    total: total,
-                    status: "Menunggu Pembayaran",
-                    waktu: serverTimestamp()
-                }).catch(err => console.log("Gagal simpan pesanan:", err));
-
-                for (let barang of cart) {
-                    if (realtimeStocks.hasOwnProperty(barang.id)) {
-                        const refStok = doc(window.fbDb, "stok_produk", String(barang.id));
-                        updateDoc(refStok, {
-                            sisa: increment(-barang.qty)
-                        }).catch(err => console.log("Gagal potong stok:", err));
-                    }
-                }
+            const modalBox = document.getElementById("checkoutModalContentBox");
+            if (modalBox) {
+                modalBox.innerHTML = `
+                    <h3><i class="fa-solid fa-circle-notch fa-spin"></i> Memproses...</h3>
+                    <p>Menyiapkan koneksi aman ke server pembayaran...</p>
+                `;
             }
 
-            saveLS("up_activeOrder", activeOrder); 
-            cart = []; 
-            saveAndSync();
-            
-            form.submit();
+            try {
+                const BACKEND_URL = 'https://www.unitproduksismkyadika13.my.id/api/bayar';
+
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        idPesanan: noPesanan,
+                        total: total,
+                        nama: nama,
+                        kelas: kelasLengkap,
+                        catatan: catatan,
+                        items: cart
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success && result.payment_url) {
+                    activeOrder = { 
+                        idPesanan: noPesanan, 
+                        nama, 
+                        kelas: kelasLengkap, 
+                        catatan, 
+                        items: [...cart], 
+                        total, 
+                        status: "Menunggu Pembayaran", 
+                        paymentUrl: result.payment_url 
+                    };
+
+                    if (window.fbReady) {
+                        const { doc, setDoc, updateDoc, serverTimestamp, increment } = window.fbFns;
+                        
+                        await setDoc(doc(window.fbDb, "pesanan", noPesanan), {
+                            idPesanan: noPesanan,
+                            nama: nama,
+                            kelas: kelasLengkap,
+                            catatan: catatan,
+                            items: cart,
+                            total: total,
+                            status: "Menunggu Pembayaran",
+                            paymentUrl: result.payment_url,
+                            waktu: serverTimestamp()
+                        }).catch(err => console.log("Gagal simpan pesanan:", err));
+
+                        for (let barang of cart) {
+                            if (realtimeStocks.hasOwnProperty(barang.id)) {
+                                const refStok = doc(window.fbDb, "stok_produk", String(barang.id));
+                                await updateDoc(refStok, {
+                                    sisa: increment(-barang.qty)
+                                }).catch(err => console.log("Gagal potong stok:", err));
+                            }
+                        }
+                    }
+
+                    saveLS("up_activeOrder", activeOrder); 
+                    cart = []; 
+                    saveAndSync();
+                    
+                    window.location.href = result.payment_url;
+                } else {
+                    alert(result.message || "Gagal membuat tagihan di Pakasir.");
+                    document.getElementById("checkoutModal").classList.remove("open");
+                    kembaliKeKatalog();
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Terjadi kendala koneksi jaringan ke server.");
+                document.getElementById("checkoutModal").classList.remove("open");
+                kembaliKeKatalog();
+            }
         }
 
         let unsubPesanan = null;
