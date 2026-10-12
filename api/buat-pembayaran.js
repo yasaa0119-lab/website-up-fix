@@ -9,12 +9,10 @@ module.exports = async function(req, res) {
   }
 
   try {
-    const { idPesanan, total, nama, kelas, catatan, items } = req.body || {};
+    const { idPesanan, total } = req.body || {};
     
     const PAKASIR_API_KEY = 'cfU4UEgD06yFzcqwBBZ6vPAl09v1qp94';
     const PROJECT_SLUG = 'unitproduksi2';
-
-    // Pastikan amount berupa angka bulat
     const amountVal = Math.round(Number(total));
 
     const PAKASIR_URL = `https://app.pakasir.com/api/v2/create-transaction/${PROJECT_SLUG}/${idPesanan}`;
@@ -32,25 +30,14 @@ module.exports = async function(req, res) {
     });
 
     const result = await response.json();
-    console.log("Response dari Pakasir:", result);
-
-    // Ambil URL pembayaran dari berbagai kemungkinan struktur respons Pakasir
     const paymentUrl = result.payment_url || result.url || (result.payment && result.payment.payment_url);
 
     if (response.ok && paymentUrl) {
-      return res.status(200).json({
-        success: true,
-        payment_url: paymentUrl
-      });
+      return res.status(200).json({ success: true, payment_url: paymentUrl });
     }
 
-    return res.status(400).json({ 
-      success: false, 
-      message: result.message || 'Gagal membuat tagihan di Pakasir (Cek API Key & Slug)' 
-    });
-
+    return res.status(400).json({ success: false, message: result.message || 'Gagal membuat tagihan di Pakasir' });
   } catch (err) {
-    console.error("Server Error:", err);
     return res.status(500).json({ success: false, message: 'Kesalahan server: ' + err.message });
   }
 };
