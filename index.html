@@ -1281,8 +1281,8 @@
             prosesPembayaranQRIS();
         }
 
-        // FUNGSI PEMBAYARAN MENGGUNAKAN ASYNC & FETCH DENGAN HEADER API KEY YANG BENAR
-        async function prosesPembayaranQRIS() {
+        // FUNGSI PEMBAYARAN MENGGUNAKAN FORM REDIRECT (BEBAS CORS)
+        function prosesPembayaranQRIS() {
             const nama = document.getElementById("inputNama").value.trim();
             const tingkat = document.getElementById("inputTingkat").value;
             const jurusan = document.getElementById("inputJurusan").value;
@@ -1300,76 +1300,62 @@
             
             activeOrder = { idPesanan: noPesanan, nama, kelas: kelasLengkap, catatan, items: [...cart], total, status: "Menunggu Pembayaran", paymentUrl: "" };
 
-            const modalBox = document.getElementById("checkoutModalContentBox");
-            if (modalBox) {
-                modalBox.innerHTML = `
-                    <h3><i class="fa-solid fa-circle-notch fa-spin"></i> Memproses...</h3>
-                    <p>Menyiapkan koneksi aman ke payment gateway...</p>
-                `;
-            }
+            const PAKASIR_API_KEY = 'cfU4UEgD06yFzcqwBBZ6vPAl09v1qp94';
+            const PROJECT_SLUG = 'unitproduksi2';
 
-            try {
-                const PAKASIR_API_KEY = 'cfU4UEgD06yFzcqwBBZ6vPAl09v1qp94';
-                const PROJECT_SLUG = 'unitproduksi2';
-                const PAKASIR_URL = `https://app.pakasir.com/api/v2/create-transaction/${PROJECT_SLUG}/${noPesanan}`;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `https://app.pakasir.com/api/v2/create-transaction/${PROJECT_SLUG}/${noPesanan}`;
 
-                const response = await fetch(PAKASIR_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Api-Key': PAKASIR_API_KEY
-                    },
-                    body: JSON.stringify({
-                        method: "payment_link",
-                        amount: Math.round(Number(total))
-                    })
-                });
+            const inputKey = document.createElement('input');
+            inputKey.type = 'hidden';
+            inputKey.name = 'x_api_key';
+            inputKey.value = PAKASIR_API_KEY;
+            form.appendChild(inputKey);
 
-                const result = await response.json();
+            const inputAmount = document.createElement('input');
+            inputAmount.type = 'hidden';
+            inputAmount.name = 'amount';
+            inputAmount.value = Math.round(Number(total));
+            form.appendChild(inputAmount);
 
-                if (result && result.payment_link) {
-                    if (window.fbReady) {
-                        const { doc, setDoc, updateDoc, serverTimestamp, increment } = window.fbFns;
-                        
-                        await setDoc(doc(window.fbDb, "pesanan", noPesanan), {
-                            idPesanan: noPesanan,
-                            nama: nama,
-                            kelas: kelasLengkap,
-                            catatan: catatan,
-                            items: cart,
-                            total: total,
-                            status: "Menunggu Pembayaran",
-                            paymentUrl: result.payment_link,
-                            waktu: serverTimestamp()
-                        });
+            const inputMethod = document.createElement('input');
+            inputMethod.type = 'hidden';
+            inputMethod.name = 'method';
+            inputMethod.value = 'payment_link';
+            form.appendChild(inputMethod);
 
-                        for (let barang of cart) {
-                            if (realtimeStocks.hasOwnProperty(barang.id)) {
-                                const refStok = doc(window.fbDb, "stok_produk", String(barang.id));
-                                await updateDoc(refStok, {
-                                    sisa: increment(-barang.qty)
-                                }).catch(err => console.log("Gagal potong stok:", err));
-                            }
-                        }
+            document.body.appendChild(form);
+
+            if (window.fbReady) {
+                const { doc, setDoc, updateDoc, serverTimestamp, increment } = window.fbFns;
+                
+                setDoc(doc(window.fbDb, "pesanan", noPesanan), {
+                    idPesanan: noPesanan,
+                    nama: nama,
+                    kelas: kelasLengkap,
+                    catatan: catatan,
+                    items: cart,
+                    total: total,
+                    status: "Menunggu Pembayaran",
+                    waktu: serverTimestamp()
+                }).catch(err => console.log("Gagal simpan pesanan:", err));
+
+                for (let barang of cart) {
+                    if (realtimeStocks.hasOwnProperty(barang.id)) {
+                        const refStok = doc(window.fbDb, "stok_produk", String(barang.id));
+                        updateDoc(refStok, {
+                            sisa: increment(-barang.qty)
+                        }).catch(err => console.log("Gagal potong stok:", err));
                     }
-
-                    activeOrder.paymentUrl = result.payment_link;
-                    saveLS("up_activeOrder", activeOrder); 
-                    cart = []; 
-                    saveAndSync();
-                    
-                    window.location.href = result.payment_link;
-                } else {
-                    alert("Gagal membuat tagihan di Pakasir.");
-                    document.getElementById("checkoutModal").classList.remove("open");
-                    kembaliKeKatalog();
                 }
-            } catch (error) {
-                console.error(error);
-                alert("Terjadi kendala koneksi jaringan.");
-                document.getElementById("checkoutModal").classList.remove("open");
-                kembaliKeKatalog();
             }
+
+            saveLS("up_activeOrder", activeOrder); 
+            cart = []; 
+            saveAndSync();
+            
+            form.submit();
         }
 
         let unsubPesanan = null;
