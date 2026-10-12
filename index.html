@@ -1279,7 +1279,7 @@
             prosesPembayaranQRIS();
         }
 
-        // FUNGSI PEMBAYARAN MENGGUNAKAN BACKEND VERCEL SERVERLESS AGAR AMAN DAN TIDAK KENA 403 / CORS
+        // FUNGSI PEMBAYARAN MENGGUNAKAN ENDPOINT YANG BENAR (/api/buat-pembayaran)
         async function prosesPembayaranQRIS() {
             const nama = document.getElementById("inputNama").value.trim();
             const tingkat = document.getElementById("inputTingkat").value;
@@ -1305,7 +1305,8 @@
             }
 
             try {
-                const BACKEND_URL = 'https://www.unitproduksismkyadika13.my.id/api/bayar';
+                // Diarahkan ke file /api/buat-pembayaran.js yang ada di folder api Vercel
+                const BACKEND_URL = '/api/buat-pembayaran';
 
                 const response = await fetch(BACKEND_URL, {
                     method: 'POST',
