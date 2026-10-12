@@ -14,8 +14,8 @@ module.exports = async function(req, res) {
     const PAKASIR_API_KEY = 'cfU4UEgD06yFzcqwBBZ6vPAl09v1qp94';
     const PROJECT_SLUG = 'unitproduksi2';
 
-    // Buat transaksi ke Pakasir
     const PAKASIR_URL = `https://app.pakasir.com/api/v2/create-transaction/${PROJECT_SLUG}/${idPesanan}`;
+
     const response = await fetch(PAKASIR_URL, {
       method: 'POST',
       headers: {
@@ -29,40 +29,25 @@ module.exports = async function(req, res) {
     });
 
     const result = await response.json();
-    
-    if (result && result.payment_link) {
-      // Simpan pesanan ke Firestore via REST API (Aman di backend, tanpa modul ribet)
-      const projectId = process.env.FIREBASE_PROJECT_ID;
-      if (projectId) {
-        const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/pesanan/${idPesanan}`;
-        
-        await fetch(firestoreUrl, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fields: {
-              idPesanan: { stringValue: String(idPesanan) },
-              nama: { stringValue: String(nama || '') },
-              kelas: { stringValue: String(kelas || '') },
-              catatan: { stringValue: String(catatan || '') },
-              total: { doubleValue: Number(total) },
-              status: { stringValue: "Menunggu Pembayaran" },
-              paymentUrl: { stringValue: String(result.payment_link) }
-            }
-          })
-        });
-      }
+    console.log("Respon Pakasir:", result); // Untuk debugging di Vercel logs jika masih ada kendala
 
+    // Menyesuaikan dengan struktur data yang dikembalikan Pakasir v2
+    const paymentUrl = result.payment_url || (result.payment && result.payment.payment_url) || result.url;
+    
+    if (response.ok && paymentUrl) {
       return res.status(200).json({
         success: true,
-        payment_url: result.payment_link
+        payment_url: paymentUrl
       });
     }
 
-    return res.status(400).json({ success: false, message: 'Gagal membuat tagihan di Pakasir' });
+    return res.status(400).json({ 
+      success: false, 
+      message: result.message || 'Gagal membuat tagihan di Pakasir' 
+    });
 
   } catch (err) {
     console.error("Server Error:", err);
-    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
+    return res.status(500).json({ success: false, message: 'Terjadi kesalahan server: ' + err.message });
   }
 };
