@@ -9,7 +9,7 @@ module.exports = async function(req, res) {
   }
 
   try {
-    const { idPesanan, total } = req.body || {};
+    const { idPesanan, total, nama } = req.body || {};
     
     const PAKASIR_API_KEY = 'cfU4UEgD06yFzcqwBBZ6vPAl09v1qp94';
     const PROJECT_SLUG = 'unitproduksi2';
@@ -25,19 +25,31 @@ module.exports = async function(req, res) {
       },
       body: JSON.stringify({
         method: "payment_link",
-        amount: amountVal
+        amount: amountVal,
+        note: `Pembayaran pesanan ${idPesanan} atas nama ${nama || 'Pelanggan'}`
       })
     });
 
     const result = await response.json();
-    const paymentUrl = result.payment_url || result.url || (result.payment && result.payment.payment_url);
+    console.log("Respon lengkap Pakasir:", result);
+
+    // Cek berbagai kemungkinan key response dari Pakasir
+    const paymentUrl = result.payment_url || result.url || (result.payment && result.payment.payment_url) || (result.data && result.data.payment_url);
 
     if (response.ok && paymentUrl) {
-      return res.status(200).json({ success: true, payment_url: paymentUrl });
+      return res.status(200).json({
+        success: true,
+        payment_url: paymentUrl
+      });
     }
 
-    return res.status(400).json({ success: false, message: result.message || 'Gagal membuat tagihan di Pakasir' });
+    return res.status(400).json({ 
+      success: false, 
+      message: result.message || 'Gagal membuat tagihan di Pakasir' 
+    });
+
   } catch (err) {
+    console.error("Server Error:", err);
     return res.status(500).json({ success: false, message: 'Kesalahan server: ' + err.message });
   }
 };
