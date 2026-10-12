@@ -11,8 +11,8 @@ module.exports = async function(req, res) {
   try {
     const { idPesanan, total, nama, kelas, catatan, items } = req.body || {};
     
-    const PAKASIR_API_KEY = 'dM7z54vGvIom2hGRLUOFVZSUE8RyMvW0';
-    const PROJECT_SLUG = 'unitproduksi';
+    const PAKASIR_API_KEY = 'cfU4UEgD06yFzcqwBBZ6vPAl09v1qp94';
+    const PROJECT_SLUG = 'unitproduksi2';
 
     // Buat transaksi ke Pakasir
     const PAKASIR_URL = `https://app.pakasir.com/api/v2/create-transaction/${PROJECT_SLUG}/${idPesanan}`;
