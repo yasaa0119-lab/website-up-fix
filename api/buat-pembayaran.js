@@ -1,7 +1,6 @@
-module.exports = async function(req, res) {
-  res.setHeader('Access-Control-Allow-Credentials', true);
+module.exports = async function (req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -9,47 +8,32 @@ module.exports = async function(req, res) {
   }
 
   try {
-    const { idPesanan, total, nama } = req.body || {};
-    
-    const PAKASIR_API_KEY = 'cfU4UEgD06yFzcqwBBZ6vPAl09v1qp94';
-    const PROJECT_SLUG = 'unitproduksi2';
+    const { idPesanan, total } = req.body || {};
+
+    // Slug proyek boleh disimpan di environment variable Vercel (PAKASIR_SLUG)
+    const PROJECT_SLUG = process.env.PAKASIR_SLUG || 'unitproduksi2';
+
     const amountVal = Math.round(Number(total));
 
-    const PAKASIR_URL = `https://app.pakasir.com/api/v2/create-transaction/${PROJECT_SLUG}/${idPesanan}`;
-
-    const response = await fetch(PAKASIR_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': PAKASIR_API_KEY
-      },
-      body: JSON.stringify({
-        method: "payment_link",
-        amount: amountVal,
-        note: `Pembayaran pesanan ${idPesanan} atas nama ${nama || 'Pelanggan'}`
-      })
-    });
-
-    const result = await response.json();
-    console.log("Respon lengkap Pakasir:", result);
-
-    // Cek berbagai kemungkinan key response dari Pakasir
-    const paymentUrl = result.payment_url || result.url || (result.payment && result.payment.payment_url) || (result.data && result.data.payment_url);
-
-    if (response.ok && paymentUrl) {
-      return res.status(200).json({
-        success: true,
-        payment_url: paymentUrl
+    if (!idPesanan || !Number.isFinite(amountVal) || amountVal <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Data pesanan tidak valid (idPesanan / total).'
       });
     }
 
-    return res.status(400).json({ 
-      success: false, 
-      message: result.message || 'Gagal membuat tagihan di Pakasir' 
-    });
+    // Format link pembayaran resmi Pakasir:
+    // https://app.pakasir.com/pay/{slug}/{amount}?order_id={order_id}
+    const paymentUrl =
+      `https://app.pakasir.com/pay/${encodeURIComponent(PROJECT_SLUG)}/${amountVal}` +
+      `?order_id=${encodeURIComponent(idPesanan)}`;
 
+    return res.status(200).json({
+      success: true,
+      payment_url: paymentUrl
+    });
   } catch (err) {
-    console.error("Server Error:", err);
+    console.error('Server Error:', err);
     return res.status(500).json({ success: false, message: 'Kesalahan server: ' + err.message });
   }
 };
